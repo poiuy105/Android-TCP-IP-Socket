@@ -36,6 +36,9 @@ jobs:
       run: |
         echo "y" | $HOME/android-sdk/tools/android update sdk --no-ui --all --filter platform-tools,android-22,build-tools-22.0.1
     
+    - name: Install system dependencies for aapt
+      run: sudo apt-get update && sudo apt-get install -y zlib1g lib32stdc++6 lib32gcc1
+    
     - name: Build Server APK
       run: chmod +x build_apk.sh && bash build_apk.sh
     
