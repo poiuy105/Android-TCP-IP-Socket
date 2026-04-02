@@ -52,20 +52,24 @@ jobs:
           -I $ANDROID_HOME/platforms/android-22/android.jar \
           --non-constant-id || { echo "aapt failed"; exit 1; }
         
-        # Step 2: Compile Java source files
+        # Step 2: Compile Java source files (with support libraries)
         echo "Step 2: Compiling Java sources..."
         find src gen -name "*.java" > sources.txt
+        CLASSPATH="$ANDROID_HOME/platforms/android-22/android.jar"
+        for jar in bin/dexedLibs/*.jar; do
+          CLASSPATH="$CLASSPATH:$jar"
+        done
         javac -d bin/classes \
           -sourcepath src:gen \
           -bootclasspath $ANDROID_HOME/platforms/android-22/android.jar \
-          -classpath $ANDROID_HOME/platforms/android-22/android.jar \
-          @sources.txt 2>&1 | head -50 || { echo "javac failed"; exit 1; }
+          -classpath "$CLASSPATH" \
+          @sources.txt 2>&1 || { echo "javac failed"; exit 1; }
         
-        # Step 3: Create DEX file (dx)
+        # Step 3: Create DEX file (dx) - include support library jars
         echo "Step 3: Creating DEX..."
         $ANDROID_HOME/build-tools/22.0.1/dx --dex \
           --output=bin/classes.dex \
-          bin/classes 2>&1 || { echo "dx failed"; exit 1; }
+          bin/classes bin/dexedLibs/*.jar 2>&1 || { echo "dx failed"; exit 1; }
         
         # Step 4: Package resources into APK (aapt)
         echo "Step 4: Packaging resources..."
