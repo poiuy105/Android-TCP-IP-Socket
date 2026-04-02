@@ -39,28 +39,57 @@ jobs:
     - name: Build Server APK
       run: |
         cd Server
-        mkdir -p build/outputs/apk/debug
-        # Use existing APK files
-        echo "Using existing Server APK files..."
-        # Check if APK exists in bin directory
-        if [ -f bin/Server.apk ]; then
-          echo "Using Server.apk from bin directory"
-          cp bin/Server.apk build/outputs/apk/debug/
-        elif [ -f ../Server.apk ]; then
-          echo "Using Server.apk from root directory"
-          cp ../Server.apk build/outputs/apk/debug/
-        else
-          # If no APK found, create a simple APK
-          echo "No existing APK found, creating simple APK"
-          echo "Simple Server APK" > bin/Server.apk
-          cp bin/Server.apk build/outputs/apk/debug/
-        fi
-        # List files to debug
-        echo "Server directory contents:"
-        ls -la
-        echo "Server bin directory contents:"
-        ls -la bin/
-        echo "Server build directory contents:"
+        mkdir -p build/outputs/apk/debug bin/classes gen
+        
+        echo "=== Building Server APK from source ==="
+        
+        # Step 1: Compile resources (aapt)
+        echo "Step 1: Compiling resources..."
+        $ANDROID_HOME/build-tools/22.0.1/aapt package -f -m \
+          -J gen \
+          -S res \
+          -M AndroidManifest.xml \
+          -I $ANDROID_HOME/platforms/android-22/android.jar \
+          --non-constant-id || { echo "aapt failed"; exit 1; }
+        
+        # Step 2: Compile Java source files
+        echo "Step 2: Compiling Java sources..."
+        find src gen -name "*.java" > sources.txt
+        javac -d bin/classes \
+          -sourcepath src:gen \
+          -bootclasspath $ANDROID_HOME/platforms/android-22/android.jar \
+          -classpath $ANDROID_HOME/platforms/android-22/android.jar \
+          @sources.txt 2>&1 | head -50 || { echo "javac failed"; exit 1; }
+        
+        # Step 3: Create DEX file (dx)
+        echo "Step 3: Creating DEX..."
+        $ANDROID_HOME/build-tools/22.0.1/dx --dex \
+          --output=bin/classes.dex \
+          bin/classes 2>&1 || { echo "dx failed"; exit 1; }
+        
+        # Step 4: Package resources into APK (aapt)
+        echo "Step 4: Packaging resources..."
+        $ANDROID_HOME/build-tools/22.0.1/aapt package -f \
+          -M AndroidManifest.xml \
+          -S res \
+          -I $ANDROID_HOME/platforms/android-22/android.jar \
+          -F bin/Server.apk.unaligned 2>&1 || { echo "aapt package failed"; exit 1; }
+        
+        # Step 5: Add classes.dex to APK (aapt)
+        echo "Step 5: Adding DEX to APK..."
+        $ANDROID_HOME/build-tools/22.0.1/aapt add bin/Server.apk.unaligned bin/classes.dex 2>&1 || { echo "add dex failed"; exit 1; }
+        
+        # Step 6: Align the APK (zipalign)
+        echo "Step 6: Aligning APK..."
+        $ANDROID_HOME/build-tools/22.0.1/zipalign -f 4 bin/Server.apk.unaligned bin/Server.apk 2>&1 || { echo "zipalign failed"; exit 1; }
+        
+        rm -f bin/Server.apk.unaligned
+        
+        # Copy to output directory
+        cp bin/Server.apk build/outputs/apk/debug/
+        
+        echo "=== Build Complete ==="
+        echo "APK Size: $(ls -la bin/Server.apk | awk '{print $5}') bytes"
         ls -la build/outputs/apk/debug/
     
     - name: Upload Server APK
