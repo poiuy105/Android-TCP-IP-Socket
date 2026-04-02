@@ -63,25 +63,6 @@ jobs:
         echo "Server build directory contents:"
         ls -la build/outputs/apk/debug/
     
-    - name: Build Client APK
-      run: |
-        cd Client
-        mkdir -p build/outputs/apk/debug
-        # Use ant to build the project
-        if [ -f build.xml ]; then
-          ant debug
-        else
-          # Manual build using aapt, dx, apkbuilder
-          echo "Building APK manually..."
-          mkdir -p bin/classes
-          # Compile Java files
-          find src -name "*.java" -print0 | xargs -0 javac -d bin/classes -sourcepath src -bootclasspath $ANDROID_HOME/platforms/android-22/android.jar 2>/dev/null || true
-        fi
-        # Copy existing APK if build fails
-        if [ -f bin/Client.apk ]; then
-          cp bin/Client.apk build/outputs/apk/debug/
-        fi
-    
     - name: Upload Server APK
       uses: actions/upload-artifact@v4
       with:
@@ -89,13 +70,4 @@ jobs:
         path: |
           Server/build/outputs/apk/debug/*.apk
           Server/bin/*.apk
-      if: always()
-    
-    - name: Upload Client APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: client-apk
-        path: |
-          Client/build/outputs/apk/debug/*.apk
-          Client/bin/*.apk
       if: always()
