@@ -13,11 +13,13 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.Enumeration;
+import java.util.HashMap;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
@@ -42,62 +44,59 @@ public class MainActivity extends Activity {
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_main);
-		tvClientMsg = (TextView) findViewById(R.id.textViewClientMessage);
-		tvServerIP = (EditText) findViewById(R.id.textViewServerIP);
-		tvServerPort = (EditText) findViewById(R.id.textViewServerPort);
-		// Set default values
-		tvServerIP.setText("127.0.0.1");
-		tvServerPort.setText("1234");
 		
-		// Initialize TextToSpeech
-		textToSpeech = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
-			@Override
-			public void onInit(int status) {
-				if (status == TextToSpeech.SUCCESS) {
-					Log.d("TTS", "TextToSpeech initialized successfully");
-				}
-			}
-		});
+		// Check if this is the first start
+		SharedPreferences prefs = getSharedPreferences("ServerPrefs", MODE_PRIVATE);
+		int startCount = prefs.getInt("startCount", 0);
 		
-		clear = (Button)findViewById(R.id.button1);
-		clear.setOnClickListener(new OnClickListener() {
+		if (startCount == 0) {
+			// First start - show full UI
+			setContentView(R.layout.activity_main);
+			tvClientMsg = (TextView) findViewById(R.id.textViewClientMessage);
+			tvServerIP = (EditText) findViewById(R.id.textViewServerIP);
+			tvServerPort = (EditText) findViewById(R.id.textViewServerPort);
+			// Set default values
+			tvServerIP.setText("127.0.0.1");
+			tvServerPort.setText("1234");
 			
-			@Override
-			public void onClick(View v) {
-				// TODO Auto-generated method stub
-				tvClientMsg.setText("");
+			clear = (Button)findViewById(R.id.button1);
+			clear.setOnClickListener(new OnClickListener() {
 				
-			}
-		});
-		
-		new Thread(new Runnable() {
-
-			@Override
-			public void run() {
-				
-				try {
-					// Get values from EditText
-					String portStr = tvServerPort.getText().toString();
-					int port = 1234; // Default port
-					try {
-						port = Integer.parseInt(portStr);
-					} catch (NumberFormatException e) {
-						// Use default port if parsing fails
-					}
-					
-					ServerSocket socServer = new ServerSocket(port);
-					Socket socClient = null;
-					while (true) {
-						socClient = socServer.accept();
-						ServerAsyncTask serverAsyncTask = new ServerAsyncTask();
-						serverAsyncTask.execute(new Socket[] { socClient });
-					}
-				} catch (IOException e) {
-					e.printStackTrace();
+				@Override
+				public void onClick(View v) {
+					tvClientMsg.setText("");
 				}
-			}
-		}).start();
+			});
+		} else {
+			// Not first start - go to background
+			Log.d("MainActivity", "Not first start, going to background");
+			moveTaskToBack(true);
+		}
+		
+		// Increment start count
+		SharedPreferences.Editor editor = prefs.edit();
+		editor.putInt("startCount", startCount + 1);
+		editor.apply();
+		
+		// Start the server service
+		Intent serviceIntent = new Intent(this, ServerService.class);
+		startService(serviceIntent);
+		Log.d("MainActivity", "ServerService started");
+		
+		// Initialize TextToSpeech (only for UI mode)
+		if (startCount == 0) {
+			textToSpeech = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+				@Override
+				public void onInit(int status) {
+					if (status == TextToSpeech.SUCCESS) {
+						Log.d("TTS", "TextToSpeech initialized successfully");
+					}
+				}
+			});
+		}
+		
+		// Server is now running in ServerService
+		Log.d("MainActivity", "Server service started, UI ready");
 	}
 
 	/**
@@ -116,149 +115,7 @@ public class MainActivity extends Activity {
 
 
 
-	/**
-	 * AsyncTask which handles the commiunication with clients
-	 */
-	class ServerAsyncTask extends AsyncTask<Socket, Void, String> {
-		@Override
-		protected String doInBackground(Socket... params) {
-			String result = null;
-			Socket mySocket = params[0];
-			try {
-				InputStream is = mySocket.getInputStream();
-				OutputStream os = mySocket.getOutputStream();
-				
-				// Parse HTTP request headers using InputStream
-				HttpRequestInfo requestInfo = parseHttpRequest(is);
-				
-				// Read POST payload if it's a POST request
-				if (requestInfo.isPost && requestInfo.contentLength > 0) {
-					result = readPostPayload(is, requestInfo.contentLength);
-				}
-				
-				// Send HTTP response
-				sendHttpResponse(os);
-				
-				mySocket.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-			return result;
-		}
-		
-		@Override
-		protected void onPostExecute(String s) {
-			if (s != null) {
-				tvClientMsg.append("POST Payload:\n" + s + "\n\n");
-				
-				// Check if payload is JSON and contains tts: true
-				try {
-					JSONObject jsonObject = new JSONObject(s);
-					if (jsonObject.has("tts") && jsonObject.getBoolean("tts")) {
-						if (jsonObject.has("txt")) {
-							String text = jsonObject.getString("txt");
-							if (!text.isEmpty() && textToSpeech != null) {
-								textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, null);
-							}
-						}
-					}
-				} catch (JSONException e) {
-					// Not a valid JSON, ignore
-				}
-			}
-		}
-		
-		/**
-		 * Parse HTTP request headers directly from InputStream
-		 */
-		private HttpRequestInfo parseHttpRequest(InputStream is) throws IOException {
-			HttpRequestInfo info = new HttpRequestInfo();
-			StringBuilder headerLine = new StringBuilder();
-			int b;
-			boolean firstLine = true;
-			
-			while ((b = is.read()) != -1) {
-				if (b == '\r') {
-					// Check for \r\n
-					int next = is.read();
-					if (next == '\n') {
-						String line = headerLine.toString();
-						headerLine.setLength(0);
-						
-						if (line.isEmpty()) {
-							// Empty line indicates end of headers
-							break;
-						}
-						
-						if (firstLine) {
-							// Check if it's a POST request
-							if (line.startsWith("POST ")) {
-								info.isPost = true;
-							}
-							firstLine = false;
-						} else if (line.toLowerCase().startsWith("content-length:")) {
-							try {
-								info.contentLength = Integer.parseInt(line.substring(15).trim());
-							} catch (NumberFormatException e) {
-								info.contentLength = 0;
-							}
-						}
-					} else if (next != -1) {
-						// Not \r\n, add back \r and the next character
-						headerLine.append('\r');
-						headerLine.append((char) next);
-					}
-				} else {
-					headerLine.append((char) b);
-				}
-			}
-			
-			return info;
-		}
-		
-		/**
-		 * Read POST payload from InputStream
-		 */
-		private String readPostPayload(InputStream is, int contentLength) throws IOException {
-			if (contentLength <= 0) {
-				return "";
-			}
-			
-			byte[] buffer = new byte[contentLength];
-			int totalRead = 0;
-			
-			while (totalRead < contentLength) {
-				int read = is.read(buffer, totalRead, contentLength - totalRead);
-				if (read == -1) break;
-				totalRead += read;
-			}
-			
-			return new String(buffer, 0, totalRead, "UTF-8");
-		}
-		
-		/**
-		 * Send HTTP response
-		 */
-		private void sendHttpResponse(OutputStream os) throws IOException {
-			String response = "HTTP/1.1 200 OK\r\n" +
-					"Content-Type: text/plain; charset=UTF-8\r\n" +
-					"Content-Length: 0\r\n" +
-					"Connection: close\r\n" +
-					"\r\n";
-			os.write(response.getBytes("UTF-8"));
-			os.flush();
-		}
-		
-		/**
-		 * HTTP request information
-		 */
-		private class HttpRequestInfo {
-			boolean isPost = false;
-			int contentLength = 0;
-		}
-	}
+
 	
 	@Override
 	protected void onDestroy() {
