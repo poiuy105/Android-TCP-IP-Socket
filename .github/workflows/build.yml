@@ -21,12 +21,13 @@ jobs:
     
     - name: Download Android SDK Command-line Tools
       run: |
-        mkdir -p $HOME/android-sdk/cmdline-tools/latest
+        mkdir -p $HOME/android-sdk/cmdline-tools
         cd $HOME/android-sdk
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
         unzip -q commandlinetools-linux-11076708_latest.zip
-        cp -r cmdline-tools/* cmdline-tools/latest/
-        rm -rf cmdline-tools
+        # Move contents to latest directory
+        mv cmdline-tools/* cmdline-tools/latest/
+        rm -rf cmdline-tools/__MACOSX
         rm commandlinetools-linux-11076708_latest.zip
     
     - name: Setup Android SDK Environment
