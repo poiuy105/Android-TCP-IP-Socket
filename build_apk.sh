@@ -16,10 +16,6 @@ if [ ! -f "$ANDROID_HOME/platforms/android-34/android.jar" ]; then
     exit 1
 fi
 
-# Check libs directory
-echo "=== Libs Directory ==="
-ls -la Server/libs/
-
 # Define paths
 AAPT="$ANDROID_HOME/build-tools/34.0.0/aapt"
 JAVAC="javac"
@@ -34,7 +30,7 @@ mkdir -p Server/gen
 
 # Step 1: Compile resources
 echo "=== Step 1: aapt compile resources ==="
-$AAPT package -f -m -J Server/gen -S Server/res -M Server/AndroidManifest.xml -I "$ANDROID_JAR" -I Server/libs/android-support-v7-appcompat-542251fa48d244d9965069beee8f8ead.jar -I Server/libs/android-support-v4-0131180b4fa77264a63c4f561b6509c8.jar
+$AAPT package -f -m -J Server/gen -S Server/res -M Server/AndroidManifest.xml -I "$ANDROID_JAR"
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to compile resources"
@@ -46,7 +42,7 @@ echo "=== Step 2: Compile Java files ==="
 find Server/src -name "*.java" > Server/src_files.txt
 find Server/gen -name "*.java" >> Server/src_files.txt
 
-$JAVAC -d Server/bin -cp "$ANDROID_JAR:Server/libs/*" @Server/src_files.txt
+$JAVAC -d Server/bin -cp "$ANDROID_JAR" @Server/src_files.txt
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to compile Java files"
@@ -55,7 +51,7 @@ fi
 
 # Step 3: Create DEX file
 echo "=== Step 3: Create DEX file ==="
-$DX --dex --output=Server/bin/classes.dex Server/bin Server/libs
+$DX --dex --output=Server/bin/classes.dex Server/bin
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to create DEX file"
@@ -64,7 +60,7 @@ fi
 
 # Step 4: Package APK
 echo "=== Step 4: Package APK ==="
-$AAPT package -f -M Server/AndroidManifest.xml -S Server/res -I "$ANDROID_JAR" -I Server/libs/android-support-v7-appcompat-542251fa48d244d9965069beee8f8ead.jar -I Server/libs/android-support-v4-0131180b4fa77264a63c4f561b6509c8.jar -F Server/bin/Server.unaligned.apk Server/bin
+$AAPT package -f -M Server/AndroidManifest.xml -S Server/res -I "$ANDROID_JAR" -F Server/bin/Server.unaligned.apk Server/bin
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to package APK"

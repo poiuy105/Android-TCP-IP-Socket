@@ -12,7 +12,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.Enumeration;
 
-import android.support.v7.app.ActionBarActivity;
+import android.app.Activity;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
@@ -24,7 +24,7 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.EditText;
 
-public class MainActivity extends ActionBarActivity {
+public class MainActivity extends Activity {
 	private TextView tvClientMsg;
 	private EditText tvServerIP, tvServerPort;
 	private int SERVER_PORT;
