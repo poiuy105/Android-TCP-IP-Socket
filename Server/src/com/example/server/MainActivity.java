@@ -175,6 +175,10 @@ public class MainActivity extends Activity {
 								info.contentLength = 0;
 							}
 						}
+					} else if (next != -1) {
+						// Not \r\n, add back \r and the next character
+						headerLine.append('\r');
+						headerLine.append((char) next);
 					}
 				} else {
 					headerLine.append((char) b);
@@ -188,6 +192,10 @@ public class MainActivity extends Activity {
 		 * Read POST payload from InputStream
 		 */
 		private String readPostPayload(InputStream is, int contentLength) throws IOException {
+			if (contentLength <= 0) {
+				return "";
+			}
+			
 			byte[] buffer = new byte[contentLength];
 			int totalRead = 0;
 			
