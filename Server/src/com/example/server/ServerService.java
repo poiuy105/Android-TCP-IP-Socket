@@ -185,9 +185,9 @@ public class ServerService extends Service {
                                 }
                                 
                                 // Set TTS parameters
-                                HashMap<String, String> params = new HashMap<>();
-                                params.put(TextToSpeech.Engine.KEY_PARAM_VOLUME, String.valueOf(volumeFloat));
-                                params.put(TextToSpeech.Engine.KEY_PARAM_PAN, String.valueOf(pan));
+                                android.os.Bundle params = new android.os.Bundle();
+                                params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volumeFloat);
+                                params.putFloat(TextToSpeech.Engine.KEY_PARAM_PAN, pan);
                                 
                                 // Speak the text
                                 textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, params, null);
