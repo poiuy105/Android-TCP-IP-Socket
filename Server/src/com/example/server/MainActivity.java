@@ -14,9 +14,13 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.Enumeration;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import android.app.Activity;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -33,6 +37,7 @@ public class MainActivity extends Activity {
 	private String SERVER_IP;
 	private String Server_Name = "Kingspp";
 	Button clear;
+	private TextToSpeech textToSpeech;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +49,16 @@ public class MainActivity extends Activity {
 		// Set default values
 		tvServerIP.setText("127.0.0.1");
 		tvServerPort.setText("1234");
+		
+		// Initialize TextToSpeech
+		textToSpeech = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+			@Override
+			public void onInit(int status) {
+				if (status == TextToSpeech.SUCCESS) {
+					Log.d("TTS", "TextToSpeech initialized successfully");
+				}
+			}
+		});
 		
 		clear = (Button)findViewById(R.id.button1);
 		clear.setOnClickListener(new OnClickListener() {
@@ -137,6 +152,21 @@ public class MainActivity extends Activity {
 		protected void onPostExecute(String s) {
 			if (s != null) {
 				tvClientMsg.append("POST Payload:\n" + s + "\n\n");
+				
+				// Check if payload is JSON and contains tts: true
+				try {
+					JSONObject jsonObject = new JSONObject(s);
+					if (jsonObject.has("tts") && jsonObject.getBoolean("tts")) {
+						if (jsonObject.has("txt")) {
+							String text = jsonObject.getString("txt");
+							if (!text.isEmpty() && textToSpeech != null) {
+								textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, null);
+							}
+						}
+					}
+				} catch (JSONException e) {
+					// Not a valid JSON, ignore
+				}
 			}
 		}
 		
@@ -228,5 +258,14 @@ public class MainActivity extends Activity {
 			boolean isPost = false;
 			int contentLength = 0;
 		}
+	}
+	
+	@Override
+	protected void onDestroy() {
+		if (textToSpeech != null) {
+			textToSpeech.stop();
+			textToSpeech.shutdown();
+		}
+		super.onDestroy();
 	}
 }
