@@ -90,7 +90,7 @@ fi
 # Step 6: Sign APK (debug keystore)
 echo "=== Step 6: Sign APK ==="
 # Create .android directory if it doesn't exist
-mkdir -p $HOME/.android
+mkdir -p "$HOME/.android"
 
 DEBUG_KEYSTORE="$HOME/.android/debug.keystore"
 if [ ! -f "$DEBUG_KEYSTORE" ]; then
