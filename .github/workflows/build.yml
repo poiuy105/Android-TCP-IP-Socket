@@ -34,8 +34,10 @@ jobs:
     
     - name: Install Android SDK Components
       run: |
-        yes | sdkmanager --licenses
-        sdkmanager --install "build-tools;34.0.0" "platforms;android-34" "platform-tools"
+        # Accept licenses
+        yes | $HOME/android-sdk/cmdline-tools/bin/sdkmanager --licenses
+        # Install components
+        $HOME/android-sdk/cmdline-tools/bin/sdkmanager "build-tools;34.0.0" "platforms;android-34" "platform-tools"
     
     - name: Build Server APK
       run: chmod +x build_apk.sh && bash build_apk.sh
