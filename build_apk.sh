@@ -51,7 +51,14 @@ fi
 
 # Step 3: Create DEX file
 echo "=== Step 3: Create DEX file ==="
-$ANDROID_HOME/build-tools/34.0.0/d8 --output=Server/bin Server/bin/classes
+# Find all class files and create DEX
+find Server/bin -name "*.class" > Server/class_files.txt
+if [ -s Server/class_files.txt ]; then
+    $ANDROID_HOME/build-tools/34.0.0/d8 --output Server/bin @Server/class_files.txt
+else
+    echo "ERROR: No class files found"
+    exit 1
+fi
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to create DEX file"
@@ -95,6 +102,7 @@ fi
 mv Server/bin/Server.signed.apk Server/bin/Server.apk
 rm Server/bin/Server.unaligned.apk
 rm Server/src_files.txt
+rm Server/class_files.txt
 
 echo "=== Build completed successfully! ==="
 echo "APK location: Server/bin/Server.apk"
