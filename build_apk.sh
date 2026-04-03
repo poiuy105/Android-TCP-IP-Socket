@@ -90,9 +90,9 @@ fi
 # Step 6: Sign APK (debug keystore)
 echo "=== Step 6: Sign APK ==="
 # Create .android directory if it doesn't exist
-mkdir -p ~/.android
+mkdir -p $HOME/.android
 
-DEBUG_KEYSTORE="~/.android/debug.keystore"
+DEBUG_KEYSTORE="$HOME/.android/debug.keystore"
 if [ ! -f "$DEBUG_KEYSTORE" ]; then
     echo "Creating debug keystore..."
     keytool -genkey -v -keystore "$DEBUG_KEYSTORE" -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android -keypass android
