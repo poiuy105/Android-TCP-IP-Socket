@@ -51,7 +51,7 @@ fi
 
 # Step 3: Create DEX file
 echo "=== Step 3: Create DEX file ==="
-$DX --dex --output=Server/bin/classes.dex Server/bin
+$ANDROID_HOME/build-tools/34.0.0/d8 --output=Server/bin Server/bin/classes
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to create DEX file"
