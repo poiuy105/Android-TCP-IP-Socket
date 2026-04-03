@@ -21,6 +21,7 @@ import org.json.JSONObject;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
@@ -69,9 +70,17 @@ public class MainActivity extends Activity {
 				}
 			});
 		} else {
-			// Not first start - go to background
-			Log.d("MainActivity", "Not first start, going to background");
-			moveTaskToBack(true);
+			// Not first start - finish activity without showing UI
+			Log.d("MainActivity", "Not first start, finishing activity");
+			// Start service and finish immediately
+			Intent serviceIntent = new Intent(this, ServerService.class);
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+				startForegroundService(serviceIntent);
+			} else {
+				startService(serviceIntent);
+			}
+			finish();
+			return;
 		}
 		
 		// Increment start count
@@ -79,10 +88,16 @@ public class MainActivity extends Activity {
 		editor.putInt("startCount", startCount + 1);
 		editor.apply();
 		
-		// Start the server service
-		Intent serviceIntent = new Intent(this, ServerService.class);
-		startService(serviceIntent);
-		Log.d("MainActivity", "ServerService started");
+		// Start the server service (only for first start)
+		if (startCount == 0) {
+			Intent serviceIntent = new Intent(this, ServerService.class);
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+				startForegroundService(serviceIntent);
+			} else {
+				startService(serviceIntent);
+			}
+			Log.d("MainActivity", "ServerService started");
+		}
 		
 		// Initialize TextToSpeech (only for UI mode)
 		if (startCount == 0) {
