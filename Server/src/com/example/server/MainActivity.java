@@ -21,9 +21,11 @@ import org.json.JSONObject;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Build;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.view.Menu;
@@ -47,9 +49,13 @@ public class MainActivity extends Activity {
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		
-		// Check if this is the first start
+		// Check and request floating window permission for first start
 		SharedPreferences prefs = getSharedPreferences("ServerPrefs", MODE_PRIVATE);
 		int startCount = prefs.getInt("startCount", 0);
+		
+		if (startCount == 0) {
+			checkFloatingWindowPermission();
+		}
 		
 		if (startCount == 0) {
 			// First start - show full UI
@@ -132,6 +138,30 @@ public class MainActivity extends Activity {
 
 
 
+	
+	private void checkFloatingWindowPermission() {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+			if (!Settings.canDrawOverlays(this)) {
+				Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+					Uri.parse("package:" + getPackageName()));
+				startActivityForResult(intent, 1001);
+			}
+		}
+	}
+	
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+		if (requestCode == 1001) {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+				if (Settings.canDrawOverlays(this)) {
+					Log.d("MainActivity", "Floating window permission granted");
+				} else {
+					Log.d("MainActivity", "Floating window permission denied");
+				}
+			}
+		}
+	}
 	
 	@Override
 	protected void onDestroy() {

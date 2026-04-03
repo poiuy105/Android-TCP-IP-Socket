@@ -15,11 +15,16 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Build;
 import android.os.AsyncTask;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 import android.app.Notification.Builder;
 
@@ -28,7 +33,29 @@ public class ServerService extends Service {
     private ServerSocket serverSocket;
     private TextToSpeech textToSpeech;
     private boolean isRunning = false;
-    private int serverPort = 1234;
+    private static final int serverPort = 1234;
+    
+    private FloatingWindowService floatingWindowService;
+    private boolean isFloatingWindowBound = false;
+    private TTSState currentTTSState = TTSState.IDLE;
+    
+    private ServiceConnection floatingWindowConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            Log.d(TAG, "FloatingWindowService connected");
+            FloatingWindowService.LocalBinder binder = (FloatingWindowService.LocalBinder) service;
+            floatingWindowService = binder.getService();
+            isFloatingWindowBound = true;
+            setupFloatingWindowListener();
+        }
+        
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            Log.d(TAG, "FloatingWindowService disconnected");
+            floatingWindowService = null;
+            isFloatingWindowBound = false;
+        }
+    };
     
     private static final String NOTIFICATION_CHANNEL_ID = "server_service_channel";
     private static final int NOTIFICATION_ID = 1001;
@@ -50,12 +77,98 @@ public class ServerService extends Service {
             public void onInit(int status) {
                 if (status == TextToSpeech.SUCCESS) {
                     Log.d(TAG, "TextToSpeech initialized successfully");
+                    setupTTSListener();
                 }
             }
         });
         
+        // Bind to FloatingWindowService
+        Intent floatingWindowIntent = new Intent(this, FloatingWindowService.class);
+        startService(floatingWindowIntent);
+        bindService(floatingWindowIntent, floatingWindowConnection, Context.BIND_AUTO_CREATE);
+        
         // Start server in a separate thread
         startServer();
+    }
+    
+    private void setupTTSListener() {
+        if (textToSpeech != null) {
+            textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override
+                public void onStart(String utteranceId) {
+                    Log.d(TAG, "TTS started");
+                    updateTTSState(TTSState.PLAYING);
+                }
+                
+                @Override
+                public void onDone(String utteranceId) {
+                    Log.d(TAG, "TTS completed");
+                    updateTTSState(TTSState.COMPLETED);
+                    // Hide floating window after a short delay
+                    new android.os.Handler().postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            hideFloatingWindow();
+                        }
+                    }, 2000);
+                }
+                
+                @Override
+                public void onError(String utteranceId) {
+                    Log.e(TAG, "TTS error");
+                    updateTTSState(TTSState.ERROR);
+                }
+            });
+        }
+    }
+    
+    private void setupFloatingWindowListener() {
+        if (floatingWindowService != null) {
+            floatingWindowService.setListener(new FloatingWindowService.FloatingWindowListener() {
+                @Override
+                public void onPause() {
+                    if (textToSpeech != null) {
+                        textToSpeech.stop();
+                    }
+                }
+                
+                @Override
+                public void onStop() {
+                    if (textToSpeech != null) {
+                        textToSpeech.stop();
+                    }
+                    updateTTSState(TTSState.IDLE);
+                }
+                
+                @Override
+                public void onClose() {
+                    if (textToSpeech != null) {
+                        textToSpeech.stop();
+                    }
+                    updateTTSState(TTSState.IDLE);
+                }
+            });
+        }
+    }
+    
+    private void updateTTSState(TTSState state) {
+        currentTTSState = state;
+        if (isFloatingWindowBound && floatingWindowService != null) {
+            floatingWindowService.updateState(state);
+        }
+    }
+    
+    private void showFloatingWindow(String text) {
+        if (isFloatingWindowBound && floatingWindowService != null) {
+            floatingWindowService.updateText(text);
+            floatingWindowService.showWindow();
+        }
+    }
+    
+    private void hideFloatingWindow() {
+        if (isFloatingWindowBound && floatingWindowService != null) {
+            floatingWindowService.hideWindow();
+        }
     }
     
     private void createNotificationChannel() {
@@ -141,6 +254,12 @@ public class ServerService extends Service {
         Log.d(TAG, "Service destroyed");
         
         isRunning = false;
+        
+        // Unbind from FloatingWindowService
+        if (isFloatingWindowBound) {
+            unbindService(floatingWindowConnection);
+            isFloatingWindowBound = false;
+        }
         
         // Shutdown server socket
         if (serverSocket != null) {
@@ -248,8 +367,15 @@ public class ServerService extends Service {
                                 params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volumeFloat);
                                 params.putFloat(TextToSpeech.Engine.KEY_PARAM_PAN, pan);
                                 
+                                // Generate unique utterance ID
+                                String utteranceId = "tts_" + System.currentTimeMillis();
+                                
+                                // Show floating window
+                                updateTTSState(TTSState.LOADING);
+                                showFloatingWindow(text);
+                                
                                 // Speak the text
-                                textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, params, null);
+                                textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId);
                             }
                         }
                     }
