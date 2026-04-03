@@ -67,6 +67,10 @@ fi
 
 # Step 4: Package APK
 echo "=== Step 4: Package APK ==="
+# Remove duplicate AndroidManifest.xml from bin directory
+if [ -f Server/bin/AndroidManifest.xml ]; then
+    rm Server/bin/AndroidManifest.xml
+fi
 $AAPT package -f -M Server/AndroidManifest.xml -S Server/res -I "$ANDROID_JAR" -F Server/bin/Server.unaligned.apk Server/bin
 
 if [ $? -ne 0 ]; then
