@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v4
@@ -18,6 +18,14 @@ jobs:
       with:
         java-version: '8'
         distribution: 'temurin'
+    
+    - name: Enable 32-bit architecture and install dependencies
+      run: |
+        sudo dpkg --add-architecture i386
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq \
+          lib32z1 libc6-i386 lib32stdc++6 lib32gcc1 \
+          libncurses5:i386 zlib1g:i386
     
     - name: Download Android SDK
       run: |
@@ -37,10 +45,7 @@ jobs:
         echo "y" | $HOME/android-sdk/tools/android update sdk --no-ui --all --filter platform-tools,android-22,build-tools-22.0.1
     
     - name: Build Server APK
-      run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq lib32z1 libc6-i386 lib32stdc++6 lib32gcc1
-        chmod +x build_apk.sh && bash build_apk.sh
+      run: chmod +x build_apk.sh && bash build_apk.sh
     
     - name: Upload Server APK
       uses: actions/upload-artifact@v4
