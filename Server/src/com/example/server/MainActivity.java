@@ -112,76 +112,82 @@ public class MainActivity extends Activity {
 			try {
 				InputStream is = mySocket.getInputStream();
 				OutputStream os = mySocket.getOutputStream();
-				PrintWriter out = new PrintWriter(new OutputStreamWriter(os, "UTF-8"), true);
-				BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-
-				// Parse HTTP request headers
-				HttpRequestInfo requestInfo = parseHttpRequest(br);
-
+				
+				// Parse HTTP request headers using InputStream
+				HttpRequestInfo requestInfo = parseHttpRequest(is);
+				
 				// Read POST payload if it's a POST request
 				if (requestInfo.isPost && requestInfo.contentLength > 0) {
 					result = readPostPayload(is, requestInfo.contentLength);
-				} else {
-					// For non-POST requests, read first line
-					result = br.readLine();
 				}
-
+				
 				// Send HTTP response
-				sendHttpResponse(out);
-
+				sendHttpResponse(os);
+				
 				mySocket.close();
 			} catch (IOException e) {
 				e.printStackTrace();
 			} catch (Exception e) {
-				// Handle any other exceptions
 				e.printStackTrace();
 			}
 			return result;
 		}
-
+		
 		@Override
 		protected void onPostExecute(String s) {
 			if (s != null) {
 				tvClientMsg.append("POST Payload:\n" + s + "\n\n");
 			}
 		}
-
+		
 		/**
-		 * Parse HTTP request headers
+		 * Parse HTTP request headers directly from InputStream
 		 */
-		private HttpRequestInfo parseHttpRequest(BufferedReader br) throws IOException {
+		private HttpRequestInfo parseHttpRequest(InputStream is) throws IOException {
 			HttpRequestInfo info = new HttpRequestInfo();
-			String line;
-
-			// Read first line (request line)
-			if ((line = br.readLine()) != null) {
-				// Check if it's a POST request
-				if (line.startsWith("POST ")) {
-					info.isPost = true;
-				}
-			}
-
-			// Read remaining headers
-			while ((line = br.readLine()) != null && !line.isEmpty()) {
-				if (line.toLowerCase().startsWith("content-length:")) {
-					try {
-						info.contentLength = Integer.parseInt(line.substring(16).trim());
-					} catch (NumberFormatException e) {
-						// Invalid Content-Length, use 0
-						info.contentLength = 0;
+			StringBuilder headerLine = new StringBuilder();
+			int b;
+			boolean firstLine = true;
+			
+			while ((b = is.read()) != -1) {
+				if (b == '\r') {
+					// Check for \r\n
+					int next = is.read();
+					if (next == '\n') {
+						String line = headerLine.toString();
+						headerLine.setLength(0);
+						
+						if (line.isEmpty()) {
+							// Empty line indicates end of headers
+							break;
+						}
+						
+						if (firstLine) {
+							// Check if it's a POST request
+							if (line.startsWith("POST ")) {
+								info.isPost = true;
+							}
+							firstLine = false;
+						} else if (line.toLowerCase().startsWith("content-length:")) {
+							try {
+								info.contentLength = Integer.parseInt(line.substring(15).trim());
+							} catch (NumberFormatException e) {
+								info.contentLength = 0;
+							}
+						}
 					}
+				} else {
+					headerLine.append((char) b);
 				}
 			}
-
+			
 			return info;
 		}
-
+		
 		/**
 		 * Read POST payload from InputStream
-		 * Content-Length is in bytes, so we need to read bytes and convert to String
 		 */
 		private String readPostPayload(InputStream is, int contentLength) throws IOException {
-			// Read exact number of bytes specified by Content-Length
 			byte[] buffer = new byte[contentLength];
 			int totalRead = 0;
 			
@@ -191,22 +197,22 @@ public class MainActivity extends Activity {
 				totalRead += read;
 			}
 			
-			// Convert bytes to String using UTF-8 encoding
 			return new String(buffer, 0, totalRead, "UTF-8");
 		}
-
+		
 		/**
 		 * Send HTTP response
 		 */
-		private void sendHttpResponse(PrintWriter out) {
-			out.println("HTTP/1.1 200 OK");
-			out.println("Content-Type: text/plain; charset=UTF-8");
-			out.println("Content-Length: 0");
-			out.println("Connection: close");
-			out.println();
-			out.flush();
+		private void sendHttpResponse(OutputStream os) throws IOException {
+			String response = "HTTP/1.1 200 OK\r\n" +
+					"Content-Type: text/plain; charset=UTF-8\r\n" +
+					"Content-Length: 0\r\n" +
+					"Connection: close\r\n" +
+					"\r\n";
+			os.write(response.getBytes("UTF-8"));
+			os.flush();
 		}
-
+		
 		/**
 		 * HTTP request information
 		 */
