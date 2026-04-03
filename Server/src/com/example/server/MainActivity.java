@@ -108,63 +108,29 @@ public class MainActivity extends Activity {
 			String result = null;
 			Socket mySocket = params[0];
 			try {
-
 				InputStream is = mySocket.getInputStream();
-				PrintWriter out = new PrintWriter(mySocket.getOutputStream(),
-						true);
+				PrintWriter out = new PrintWriter(mySocket.getOutputStream(), true);
+				BufferedReader br = new BufferedReader(new InputStreamReader(is));
 
-				BufferedReader br = new BufferedReader(
-						new InputStreamReader(is));
-
-				// Read HTTP request headers
-				String line;
-				boolean isPost = false;
-				int contentLength = 0;
-
-				// Read first line (request line)
-				if ((line = br.readLine()) != null) {
-					// Check if it's a POST request
-					if (line.startsWith("POST ")) {
-						isPost = true;
-					}
-				}
-
-				// Read remaining headers
-				while ((line = br.readLine()) != null && !line.isEmpty()) {
-					if (line.toLowerCase().startsWith("content-length:")) {
-						try {
-							contentLength = Integer.parseInt(line.substring(16).trim());
-						} catch (NumberFormatException e) {
-							// Invalid Content-Length, use 0
-						}
-					}
-				}
+				// Parse HTTP request
+				HttpRequestInfo requestInfo = parseHttpRequest(br);
 
 				// Read POST payload if it's a POST request
-				if (isPost && contentLength > 0) {
-					char[] buffer = new char[contentLength];
-					int bytesRead = 0;
-					while (bytesRead < contentLength) {
-						int read = br.read(buffer, bytesRead, contentLength - bytesRead);
-						if (read == -1) break;
-						bytesRead += read;
-					}
-					result = new String(buffer, 0, bytesRead);
+				if (requestInfo.isPost && requestInfo.contentLength > 0) {
+					result = readPostPayload(br, requestInfo.contentLength);
 				} else {
 					// For non-POST requests, read first line
 					result = br.readLine();
 				}
 
 				// Send HTTP response
-				out.println("HTTP/1.1 200 OK");
-				out.println("Content-Type: text/plain");
-				out.println("Content-Length: 0");
-				out.println("Connection: close");
-				out.println();
-				out.flush();
+				sendHttpResponse(out);
 
 				mySocket.close();
 			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (Exception e) {
+				// Handle any other exceptions
 				e.printStackTrace();
 			}
 			return result;
@@ -175,6 +141,70 @@ public class MainActivity extends Activity {
 			if (s != null) {
 				tvClientMsg.append("POST Payload:\n" + s + "\n\n");
 			}
+		}
+
+		/**
+		 * Parse HTTP request headers
+		 */
+		private HttpRequestInfo parseHttpRequest(BufferedReader br) throws IOException {
+			HttpRequestInfo info = new HttpRequestInfo();
+			String line;
+
+			// Read first line (request line)
+			if ((line = br.readLine()) != null) {
+				// Check if it's a POST request
+				if (line.startsWith("POST ")) {
+					info.isPost = true;
+				}
+			}
+
+			// Read remaining headers
+			while ((line = br.readLine()) != null && !line.isEmpty()) {
+				if (line.toLowerCase().startsWith("content-length:")) {
+					try {
+						info.contentLength = Integer.parseInt(line.substring(16).trim());
+					} catch (NumberFormatException e) {
+						// Invalid Content-Length, use 0
+						info.contentLength = 0;
+					}
+				}
+			}
+
+			return info;
+		}
+
+		/**
+		 * Read POST payload
+		 */
+		private String readPostPayload(BufferedReader br, int contentLength) throws IOException {
+			char[] buffer = new char[contentLength];
+			int bytesRead = 0;
+			while (bytesRead < contentLength) {
+				int read = br.read(buffer, bytesRead, contentLength - bytesRead);
+				if (read == -1) break;
+				bytesRead += read;
+			}
+			return new String(buffer, 0, bytesRead);
+		}
+
+		/**
+		 * Send HTTP response
+		 */
+		private void sendHttpResponse(PrintWriter out) {
+			out.println("HTTP/1.1 200 OK");
+			out.println("Content-Type: text/plain");
+			out.println("Content-Length: 0");
+			out.println("Connection: close");
+			out.println();
+			out.flush();
+		}
+
+		/**
+		 * HTTP request information
+		 */
+		private class HttpRequestInfo {
+			boolean isPost = false;
+			int contentLength = 0;
 		}
 	}
 }
