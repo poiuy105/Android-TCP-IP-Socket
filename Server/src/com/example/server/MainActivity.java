@@ -177,14 +177,21 @@ public class MainActivity extends Activity {
 		 * Read POST payload
 		 */
 		private String readPostPayload(BufferedReader br, int contentLength) throws IOException {
-			char[] buffer = new char[contentLength];
+			// Use StringBuilder for better performance and reliability
+			StringBuilder payload = new StringBuilder();
+			char[] buffer = new char[1024]; // 1KB buffer
 			int bytesRead = 0;
-			while (bytesRead < contentLength) {
-				int read = br.read(buffer, bytesRead, contentLength - bytesRead);
+			int totalRead = 0;
+			
+			// Read until we've read the specified content length or no more data
+			while (totalRead < contentLength) {
+				int read = br.read(buffer, 0, Math.min(buffer.length, contentLength - totalRead));
 				if (read == -1) break;
-				bytesRead += read;
+				payload.append(buffer, 0, read);
+				totalRead += read;
 			}
-			return new String(buffer, 0, bytesRead);
+			
+			return payload.toString();
 		}
 
 		/**
