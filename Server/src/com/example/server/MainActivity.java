@@ -113,12 +113,55 @@ public class MainActivity extends Activity {
 				PrintWriter out = new PrintWriter(mySocket.getOutputStream(),
 						true);
 
-				out.println("Welcome to \""+Server_Name+"\" Server");
-
 				BufferedReader br = new BufferedReader(
 						new InputStreamReader(is));
 
-				result = br.readLine();
+				// Read HTTP request headers
+				String line;
+				boolean isPost = false;
+				int contentLength = 0;
+
+				// Read first line (request line)
+				if ((line = br.readLine()) != null) {
+					// Check if it's a POST request
+					if (line.startsWith("POST ")) {
+						isPost = true;
+					}
+				}
+
+				// Read remaining headers
+				while ((line = br.readLine()) != null && !line.isEmpty()) {
+					if (line.toLowerCase().startsWith("content-length:")) {
+						try {
+							contentLength = Integer.parseInt(line.substring(16).trim());
+						} catch (NumberFormatException e) {
+							// Invalid Content-Length, use 0
+						}
+					}
+				}
+
+				// Read POST payload if it's a POST request
+				if (isPost && contentLength > 0) {
+					char[] buffer = new char[contentLength];
+					int bytesRead = 0;
+					while (bytesRead < contentLength) {
+						int read = br.read(buffer, bytesRead, contentLength - bytesRead);
+						if (read == -1) break;
+						bytesRead += read;
+					}
+					result = new String(buffer, 0, bytesRead);
+				} else {
+					// For non-POST requests, read first line
+					result = br.readLine();
+				}
+
+				// Send HTTP response
+				out.println("HTTP/1.1 200 OK");
+				out.println("Content-Type: text/plain");
+				out.println("Content-Length: 0");
+				out.println("Connection: close");
+				out.println();
+				out.flush();
 
 				mySocket.close();
 			} catch (IOException e) {
@@ -129,9 +172,9 @@ public class MainActivity extends Activity {
 
 		@Override
 		protected void onPostExecute(String s) {
-
-			tvClientMsg.append(s+"\n");
-			
+			if (s != null) {
+				tvClientMsg.append("POST Payload:\n" + s + "\n\n");
+			}
 		}
 	}
 }
