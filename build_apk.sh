@@ -87,6 +87,25 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Step 6: Sign APK (debug keystore)
+echo "=== Step 6: Sign APK ==="
+# Create .android directory if it doesn't exist
+mkdir -p ~/.android
+
+DEBUG_KEYSTORE="~/.android/debug.keystore"
+if [ ! -f "$DEBUG_KEYSTORE" ]; then
+    echo "Creating debug keystore..."
+    keytool -genkey -v -keystore "$DEBUG_KEYSTORE" -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android -keypass android
+fi
+
+# Use apksigner to sign the APK
+$APKSIGNER sign --ks "$DEBUG_KEYSTORE" --ks-pass pass:android --key-pass pass:android Server/bin/Server.apk
+
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to sign APK"
+    exit 1
+fi
+
 # Clean up
 rm Server/bin/Server.unaligned.apk
 rm Server/src_files.txt
