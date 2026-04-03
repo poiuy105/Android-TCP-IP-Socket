@@ -1,0 +1,11 @@
+﻿gh : gh: Not Found (HTTP 404)
+At line:1 char:5
++ & { gh api repos/poiuy105/Android-TCP-IP-Socket/actio
+ns/jobs/23926788 ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (gh: Not F 
+   ound (HTTP 404):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+{"message":"Not Found","documentation_url":"https://docs.github.com/rest/actions/workflow-jobs#download-job-logs-for-a-workflow-run","status":"404"}
