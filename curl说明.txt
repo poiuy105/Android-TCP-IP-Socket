@@ -1,0 +1,8 @@
+
+C:\Users\HP>curl -X POST http://192.168.1.173:1234 -d "Hello Worlads到d"
+
+C:\Users\HP>curl -X POST http://192.168.1.173:1234 -H "Content-Type: application/json" -d "{\"name\": \"test\", \"value\": \"12ads得到3\"}"
+
+C:\Users\HP>curl -X POST http://192.168.1.173:1234 -H "Content-Type: application/json" -d "{\"name\": \"test\", \"value\": \"12ads得到爱上对方会卡上的减肥3\"}"
+
+C:\Users\HP>
