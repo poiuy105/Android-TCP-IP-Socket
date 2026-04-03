@@ -109,15 +109,16 @@ public class MainActivity extends Activity {
 			Socket mySocket = params[0];
 			try {
 				InputStream is = mySocket.getInputStream();
-				PrintWriter out = new PrintWriter(mySocket.getOutputStream(), true);
-				BufferedReader br = new BufferedReader(new InputStreamReader(is));
+				OutputStream os = mySocket.getOutputStream();
+				PrintWriter out = new PrintWriter(new OutputStreamWriter(os, "UTF-8"), true);
+				BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
 
-				// Parse HTTP request
+				// Parse HTTP request headers
 				HttpRequestInfo requestInfo = parseHttpRequest(br);
 
 				// Read POST payload if it's a POST request
 				if (requestInfo.isPost && requestInfo.contentLength > 0) {
-					result = readPostPayload(br, requestInfo.contentLength);
+					result = readPostPayload(is, requestInfo.contentLength);
 				} else {
 					// For non-POST requests, read first line
 					result = br.readLine();
@@ -174,24 +175,22 @@ public class MainActivity extends Activity {
 		}
 
 		/**
-		 * Read POST payload
+		 * Read POST payload from InputStream
+		 * Content-Length is in bytes, so we need to read bytes and convert to String
 		 */
-		private String readPostPayload(BufferedReader br, int contentLength) throws IOException {
-			// Use StringBuilder for better performance and reliability
-			StringBuilder payload = new StringBuilder();
-			char[] buffer = new char[1024]; // 1KB buffer
-			int bytesRead = 0;
+		private String readPostPayload(InputStream is, int contentLength) throws IOException {
+			// Read exact number of bytes specified by Content-Length
+			byte[] buffer = new byte[contentLength];
 			int totalRead = 0;
 			
-			// Read until we've read the specified content length or no more data
 			while (totalRead < contentLength) {
-				int read = br.read(buffer, 0, Math.min(buffer.length, contentLength - totalRead));
+				int read = is.read(buffer, totalRead, contentLength - totalRead);
 				if (read == -1) break;
-				payload.append(buffer, 0, read);
 				totalRead += read;
 			}
 			
-			return payload.toString();
+			// Convert bytes to String using UTF-8 encoding
+			return new String(buffer, 0, totalRead, "UTF-8");
 		}
 
 		/**
@@ -199,7 +198,7 @@ public class MainActivity extends Activity {
 		 */
 		private void sendHttpResponse(PrintWriter out) {
 			out.println("HTTP/1.1 200 OK");
-			out.println("Content-Type: text/plain");
+			out.println("Content-Type: text/plain; charset=UTF-8");
 			out.println("Content-Length: 0");
 			out.println("Connection: close");
 			out.println();
