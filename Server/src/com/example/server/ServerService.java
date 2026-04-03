@@ -10,12 +10,18 @@ import java.util.HashMap;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.os.Build;
 import android.os.AsyncTask;
 import android.os.IBinder;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
+import android.app.Notification.Builder;
 
 public class ServerService extends Service {
     private static final String TAG = "ServerService";
@@ -24,10 +30,19 @@ public class ServerService extends Service {
     private boolean isRunning = false;
     private int serverPort = 1234;
     
+    private static final String NOTIFICATION_CHANNEL_ID = "server_service_channel";
+    private static final int NOTIFICATION_ID = 1001;
+    
     @Override
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "Service created");
+        
+        // Create notification channel for foreground service
+        createNotificationChannel();
+        
+        // Start foreground service with notification
+        startForeground(NOTIFICATION_ID, createNotification());
         
         // Initialize TextToSpeech
         textToSpeech = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
@@ -41,6 +56,50 @@ public class ServerService extends Service {
         
         // Start server in a separate thread
         startServer();
+    }
+    
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "TCP Server Service",
+                NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("Background service for TCP server");
+            
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
+    }
+    
+    private Notification createNotification() {
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+            this, 
+            0, 
+            notificationIntent, 
+            PendingIntent.FLAG_IMMUTABLE
+        );
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
+                .setContentTitle("TCP Server")
+                .setContentText("Server running on port 1234")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .build();
+        } else {
+            return new Notification.Builder(this)
+                .setContentTitle("TCP Server")
+                .setContentText("Server running on port 1234")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .build();
+        }
     }
     
     private void startServer() {
