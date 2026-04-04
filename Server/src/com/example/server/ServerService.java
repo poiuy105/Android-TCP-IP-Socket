@@ -22,6 +22,8 @@ import android.content.ServiceConnection;
 import android.os.Build;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.IBinder;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
@@ -38,6 +40,7 @@ public class ServerService extends Service {
     private FloatingWindowService floatingWindowService;
     private boolean isFloatingWindowBound = false;
     private TTSState currentTTSState = TTSState.IDLE;
+    private Handler mainHandler;
     
     private ServiceConnection floatingWindowConnection = new ServiceConnection() {
         @Override
@@ -63,6 +66,9 @@ public class ServerService extends Service {
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "Service created");
+        
+        // Initialize main thread handler
+        mainHandler = new Handler(Looper.getMainLooper());
         
         // Create notification channel for foreground service
         createNotificationChannel();
@@ -95,16 +101,19 @@ public class ServerService extends Service {
             textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                 @Override
                 public void onStart(String utteranceId) {
-                    Log.d(TAG, "TTS started");
+                    Log.d(TAG, "TTS started - utteranceId: " + utteranceId);
                 }
                 
                 @Override
                 public void onDone(String utteranceId) {
-                    Log.d(TAG, "TTS completed");
-                    // Hide floating window after a short delay
-                    new android.os.Handler().postDelayed(new Runnable() {
+                    Log.d(TAG, "TTS completed - utteranceId: " + utteranceId);
+                    Log.d(TAG, "Starting 2-second delay before hiding window");
+                    
+                    // Use main thread handler to ensure UI operations run on main thread
+                    mainHandler.postDelayed(new Runnable() {
                         @Override
                         public void run() {
+                            Log.d(TAG, "2-second delay elapsed, calling hideFloatingWindow()");
                             hideFloatingWindow();
                         }
                     }, 2000);
@@ -112,23 +121,39 @@ public class ServerService extends Service {
                 
                 @Override
                 public void onError(String utteranceId) {
-                    Log.e(TAG, "TTS error");
-                    hideFloatingWindow();
+                    Log.e(TAG, "TTS error - utteranceId: " + utteranceId);
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            hideFloatingWindow();
+                        }
+                    });
                 }
             });
+            Log.d(TAG, "TTS UtteranceProgressListener set up successfully");
+        } else {
+            Log.e(TAG, "textToSpeech is null, cannot set up listener");
         }
     }
     
     private void showFloatingWindow(String text) {
+        Log.d(TAG, "showFloatingWindow called with text: " + text);
         if (isFloatingWindowBound && floatingWindowService != null) {
+            Log.d(TAG, "FloatingWindowService is bound, calling updateText and showWindow");
             floatingWindowService.updateText(text);
             floatingWindowService.showWindow();
+        } else {
+            Log.w(TAG, "FloatingWindowService not bound, cannot show window");
         }
     }
     
     private void hideFloatingWindow() {
+        Log.d(TAG, "hideFloatingWindow called");
         if (isFloatingWindowBound && floatingWindowService != null) {
+            Log.d(TAG, "FloatingWindowService is bound, calling hideWindow");
             floatingWindowService.hideWindow();
+        } else {
+            Log.w(TAG, "FloatingWindowService not bound, cannot hide window");
         }
     }
     

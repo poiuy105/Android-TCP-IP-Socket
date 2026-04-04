@@ -47,6 +47,7 @@ public class FloatingWindowService extends Service {
     }
     
     public void showWindow() {
+        Log.d(TAG, "showWindow called");
         if (floatingView != null && floatingView.getWindowToken() == null) {
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 getWindowWidth(),
@@ -64,14 +65,19 @@ public class FloatingWindowService extends Service {
             params.y = 16;
             
             windowManager.addView(floatingView, params);
-            Log.d(TAG, "Floating window shown");
+            Log.d(TAG, "Floating window shown successfully");
+        } else {
+            Log.w(TAG, "Cannot show window - view is null or already shown");
         }
     }
     
     public void hideWindow() {
+        Log.d(TAG, "hideWindow called");
         if (floatingView != null && floatingView.getWindowToken() != null) {
             windowManager.removeView(floatingView);
-            Log.d(TAG, "Floating window hidden");
+            Log.d(TAG, "Floating window hidden successfully");
+        } else {
+            Log.w(TAG, "Cannot hide window - view is null or not shown");
         }
     }
     
