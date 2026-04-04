@@ -46,7 +46,6 @@ public class ServerService extends Service {
             FloatingWindowService.LocalBinder binder = (FloatingWindowService.LocalBinder) service;
             floatingWindowService = binder.getService();
             isFloatingWindowBound = true;
-            setupFloatingWindowListener();
         }
         
         @Override
@@ -97,13 +96,11 @@ public class ServerService extends Service {
                 @Override
                 public void onStart(String utteranceId) {
                     Log.d(TAG, "TTS started");
-                    updateTTSState(TTSState.PLAYING);
                 }
                 
                 @Override
                 public void onDone(String utteranceId) {
                     Log.d(TAG, "TTS completed");
-                    updateTTSState(TTSState.COMPLETED);
                     // Hide floating window after a short delay
                     new android.os.Handler().postDelayed(new Runnable() {
                         @Override
@@ -116,45 +113,9 @@ public class ServerService extends Service {
                 @Override
                 public void onError(String utteranceId) {
                     Log.e(TAG, "TTS error");
-                    updateTTSState(TTSState.ERROR);
+                    hideFloatingWindow();
                 }
             });
-        }
-    }
-    
-    private void setupFloatingWindowListener() {
-        if (floatingWindowService != null) {
-            floatingWindowService.setListener(new FloatingWindowService.FloatingWindowListener() {
-                @Override
-                public void onPause() {
-                    if (textToSpeech != null) {
-                        textToSpeech.stop();
-                    }
-                }
-                
-                @Override
-                public void onStop() {
-                    if (textToSpeech != null) {
-                        textToSpeech.stop();
-                    }
-                    updateTTSState(TTSState.IDLE);
-                }
-                
-                @Override
-                public void onClose() {
-                    if (textToSpeech != null) {
-                        textToSpeech.stop();
-                    }
-                    updateTTSState(TTSState.IDLE);
-                }
-            });
-        }
-    }
-    
-    private void updateTTSState(TTSState state) {
-        currentTTSState = state;
-        if (isFloatingWindowBound && floatingWindowService != null) {
-            floatingWindowService.updateState(state);
         }
     }
     
@@ -371,7 +332,6 @@ public class ServerService extends Service {
                                 String utteranceId = "tts_" + System.currentTimeMillis();
                                 
                                 // Show floating window
-                                updateTTSState(TTSState.LOADING);
                                 showFloatingWindow(text);
                                 
                                 // Speak the text
