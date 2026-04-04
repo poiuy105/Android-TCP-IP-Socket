@@ -44,13 +44,13 @@ jobs:
         # Install components
         $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager "build-tools;34.0.0" "platforms;android-34" "platform-tools"
     
-    - name: Build Server APK
+    - name: Build PostTellMe APK
       run: chmod +x build_apk.sh && bash build_apk.sh
     
-    - name: Upload Server APK
+    - name: Upload PostTellMe APK
       uses: actions/upload-artifact@v4
       with:
-        name: server-apk
+        name: PostTellMe-apk
         path: |
           Server/build/outputs/apk/debug/*.apk
           Server/bin/*.apk
