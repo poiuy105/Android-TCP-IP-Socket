@@ -15,6 +15,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -61,6 +62,7 @@ public class ServerService extends Service {
     
     private static final String NOTIFICATION_CHANNEL_ID = "server_service_channel";
     private static final int NOTIFICATION_ID = 1001;
+    private int currentServerPort = 1234;
     
     @Override
     public void onCreate() {
@@ -161,16 +163,44 @@ public class ServerService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
-                "TCP Server Service",
+                "Post Tell Me Service",
                 NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Background service for TCP server");
+            channel.setDescription("Background service for Post Tell Me");
             
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {
                 manager.createNotificationChannel(channel);
             }
         }
+    }
+    
+    private String getDeviceIpAddress() {
+        String ipAddress = "127.0.0.1";
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                java.net.NetworkInterface networkInterface = interfaces.nextElement();
+                if (networkInterface.isLoopback() || !networkInterface.isUp()) {
+                    continue;
+                }
+                
+                java.util.Enumeration<java.net.InetAddress> addresses = networkInterface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    java.net.InetAddress inetAddress = addresses.nextElement();
+                    if (!inetAddress.isLoopbackAddress() && inetAddress.getHostAddress().indexOf(':') < 0) {
+                        ipAddress = inetAddress.getHostAddress();
+                        if (networkInterface.getName().toLowerCase().contains("wlan") ||
+                            networkInterface.getName().toLowerCase().contains("wifi")) {
+                            return ipAddress;
+                        }
+                    }
+                }
+            }
+        } catch (java.net.SocketException e) {
+            Log.e(TAG, "Error getting IP address", e);
+        }
+        return ipAddress;
     }
     
     private Notification createNotification() {
@@ -182,18 +212,21 @@ public class ServerService extends Service {
             PendingIntent.FLAG_IMMUTABLE
         );
         
+        String ipAddress = getDeviceIpAddress();
+        String contentText = ipAddress + ":" + currentServerPort;
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             return new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
-                .setContentTitle("TCP Server")
-                .setContentText("Server running on port 1234")
+                .setContentTitle("post tell me")
+                .setContentText(contentText)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build();
         } else {
             return new Notification.Builder(this)
-                .setContentTitle("TCP Server")
-                .setContentText("Server running on port 1234")
+                .setContentTitle("post tell me")
+                .setContentText(contentText)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
@@ -201,14 +234,26 @@ public class ServerService extends Service {
         }
     }
     
+    public void updateNotification() {
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) {
+            manager.notify(NOTIFICATION_ID, createNotification());
+        }
+    }
+    
     private void startServer() {
+        startServer(currentServerPort);
+    }
+    
+    private void startServer(int port) {
         isRunning = true;
+        currentServerPort = port;
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    serverSocket = new ServerSocket(serverPort);
-                    Log.d(TAG, "Server started on port " + serverPort);
+                    serverSocket = new ServerSocket(currentServerPort);
+                    Log.d(TAG, "Server started on port " + currentServerPort);
                     
                     while (isRunning) {
                         try {
@@ -231,6 +276,31 @@ public class ServerService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "Service started");
+        
+        if (intent != null && intent.hasExtra("port")) {
+            int newPort = intent.getIntExtra("port", currentServerPort);
+            if (newPort != currentServerPort) {
+                Log.d(TAG, "Changing port from " + currentServerPort + " to " + newPort);
+                
+                // Stop current server
+                isRunning = false;
+                if (serverSocket != null) {
+                    try {
+                        serverSocket.close();
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error closing server socket", e);
+                    }
+                }
+                
+                // Start server with new port
+                currentServerPort = newPort;
+                startServer(currentServerPort);
+                
+                // Update notification
+                updateNotification();
+            }
+        }
+        
         return START_STICKY;
     }
     

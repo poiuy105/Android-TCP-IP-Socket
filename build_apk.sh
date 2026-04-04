@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build script for Android TCP Server app
+# Build script for Post Tell Me Android app
 
 echo "=== Environment Check ==="
 echo "ANDROID_HOME=$ANDROID_HOME"
@@ -71,7 +71,7 @@ echo "=== Step 4: Package APK ==="
 if [ -f Server/bin/AndroidManifest.xml ]; then
     rm Server/bin/AndroidManifest.xml
 fi
-$AAPT package -f -M Server/AndroidManifest.xml -S Server/res -I "$ANDROID_JAR" -F Server/bin/Server.unaligned.apk Server/bin
+$AAPT package -f -M Server/AndroidManifest.xml -S Server/res -I "$ANDROID_JAR" -F Server/bin/PostTellMe.unaligned.apk Server/bin
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to package APK"
@@ -80,7 +80,7 @@ fi
 
 # Step 5: Align APK
 echo "=== Step 5: Align APK ==="
-$ZIPALIGN -f 4 Server/bin/Server.unaligned.apk Server/bin/Server.apk
+$ZIPALIGN -f 4 Server/bin/PostTellMe.unaligned.apk Server/bin/PostTellMe.apk
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to align APK"
@@ -99,7 +99,7 @@ if [ ! -f "$DEBUG_KEYSTORE" ]; then
 fi
 
 # Use apksigner to sign the APK
-$APKSIGNER sign --ks "$DEBUG_KEYSTORE" --ks-pass pass:android --key-pass pass:android Server/bin/Server.apk
+$APKSIGNER sign --ks "$DEBUG_KEYSTORE" --ks-pass pass:android --key-pass pass:android Server/bin/PostTellMe.apk
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to sign APK"
@@ -107,9 +107,9 @@ if [ $? -ne 0 ]; then
 fi
 
 # Clean up
-rm Server/bin/Server.unaligned.apk
+rm Server/bin/PostTellMe.unaligned.apk
 rm Server/src_files.txt
 rm Server/class_files.txt
 
 echo "=== Build completed successfully! ==="
-echo "APK location: Server/bin/Server.apk"
+echo "APK location: Server/bin/PostTellMe.apk"

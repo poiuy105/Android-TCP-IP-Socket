@@ -63,9 +63,47 @@ public class MainActivity extends Activity {
 			tvClientMsg = (TextView) findViewById(R.id.textViewClientMessage);
 			tvServerIP = (EditText) findViewById(R.id.textViewServerIP);
 			tvServerPort = (EditText) findViewById(R.id.textViewServerPort);
-			// Set default values
-			tvServerIP.setText("127.0.0.1");
+			// Set default values - auto detect IP address
+			String detectedIp = getDeviceIpAddress();
+			tvServerIP.setText(detectedIp);
 			tvServerPort.setText("1234");
+			
+			// Setup port confirm button
+			Button btnConfirmPort = (Button) findViewById(R.id.buttonConfirmPort);
+			if (btnConfirmPort != null) {
+				btnConfirmPort.setOnClickListener(new OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						String portStr = tvServerPort.getText().toString().trim();
+						if (!portStr.isEmpty()) {
+							try {
+								int newPort = Integer.parseInt(portStr);
+								if (newPort > 0 && newPort <= 65535) {
+									// Save port to preferences
+									SharedPreferences.Editor editor = prefs.edit();
+									editor.putInt("serverPort", newPort);
+									editor.apply();
+									
+									// Restart service with new port
+									Intent restartIntent = new Intent(MainActivity.this, ServerService.class);
+									restartIntent.putExtra("port", newPort);
+									if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+										startForegroundService(restartIntent);
+									} else {
+										startService(restartIntent);
+									}
+									
+									Log.d("MainActivity", "Port changed to: " + newPort);
+								} else {
+									tvServerPort.setError("Port must be 1-65535");
+								}
+							} catch (NumberFormatException e) {
+								tvServerPort.setError("Invalid port number");
+							}
+						}
+					}
+				});
+			}
 			
 			clear = (Button)findViewById(R.id.button1);
 			clear.setOnClickListener(new OnClickListener() {
@@ -124,9 +162,36 @@ public class MainActivity extends Activity {
 	/**
 	 * Get ip address of the device
 	 */
-	public void getDeviceIpAddress() {
-		// Hardcode IP address to 127.0.0.1
-		tvServerIP.setText("127.0.0.1");
+	public String getDeviceIpAddress() {
+		String ipAddress = "127.0.0.1";
+		try {
+			Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+			while (interfaces.hasMoreElements()) {
+				NetworkInterface networkInterface = interfaces.nextElement();
+				// Skip loopback and disabled interfaces
+				if (networkInterface.isLoopback() || !networkInterface.isUp()) {
+					continue;
+				}
+				
+				Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+				while (addresses.hasMoreElements()) {
+					InetAddress inetAddress = addresses.nextElement();
+					// Get IPv4 address only
+					if (!inetAddress.isLoopbackAddress() && inetAddress.getHostAddress().indexOf(':') < 0) {
+						ipAddress = inetAddress.getHostAddress();
+						Log.d("MainActivity", "Found IP: " + ipAddress + " on interface: " + networkInterface.getName());
+						// Prefer WiFi interface
+						if (networkInterface.getName().toLowerCase().contains("wlan") ||
+						    networkInterface.getName().toLowerCase().contains("wifi")) {
+							return ipAddress;
+						}
+					}
+				}
+			}
+		} catch (SocketException e) {
+			Log.e("MainActivity", "Error getting IP address", e);
+		}
+		return ipAddress;
 	}
 
 	@Override
