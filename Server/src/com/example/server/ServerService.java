@@ -78,13 +78,17 @@ public class ServerService extends Service {
         // Start foreground service with notification
         startForeground(NOTIFICATION_ID, createNotification());
         
-        // Initialize TextToSpeech
+        // Initialize TextToSpeech with电视设备适配
         textToSpeech = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
             @Override
             public void onInit(int status) {
                 if (status == TextToSpeech.SUCCESS) {
                     Log.d(TAG, "TextToSpeech initialized successfully");
+                    // 电视设备TTS引擎优化
+                    setupTTSForTV();
                     setupTTSListener();
+                } else {
+                    Log.e(TAG, "TextToSpeech initialization failed with status: " + status);
                 }
             }
         });
@@ -96,6 +100,33 @@ public class ServerService extends Service {
         
         // Start server in a separate thread
         startServer();
+    }
+    
+    private void setupTTSForTV() {
+        if (textToSpeech != null) {
+            // 获取可用的TTS引擎列表
+            android.speech.tts.TextToSpeech.EngineInfo[] engines = textToSpeech.getEngines();
+            if (engines != null && engines.length > 0) {
+                Log.d(TAG, "Available TTS engines: " + engines.length);
+                for (int i = 0; i < engines.length; i++) {
+                    Log.d(TAG, "Engine " + i + ": " + engines[i].name + ", label: " + engines[i].label);
+                }
+            }
+            
+            // 电视设备TTS参数优化
+            // 设置语言为中文
+            int result = textToSpeech.setLanguage(java.util.Locale.CHINA);
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Log.e(TAG, "Chinese language not supported, trying English");
+                textToSpeech.setLanguage(java.util.Locale.US);
+            }
+            
+            // 设置语速和音调，适配电视设备
+            textToSpeech.setSpeechRate(1.0f); // 正常语速
+            textToSpeech.setPitch(1.0f); // 正常音调
+            
+            Log.d(TAG, "TTS optimized for TV devices");
+        }
     }
     
     private void setupTTSListener() {
@@ -215,23 +246,30 @@ public class ServerService extends Service {
         String ipAddress = getDeviceIpAddress();
         String contentText = ipAddress + ":" + currentServerPort;
         
+        // 电视设备通知优化
+        Notification.Builder builder;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            return new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
-                .setContentTitle("post tell me")
-                .setContentText(contentText)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentIntent(pendingIntent)
-                .setOngoing(true)
-                .build();
+            builder = new Notification.Builder(this, NOTIFICATION_CHANNEL_ID);
         } else {
-            return new Notification.Builder(this)
-                .setContentTitle("post tell me")
-                .setContentText(contentText)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentIntent(pendingIntent)
-                .setOngoing(true)
-                .build();
+            builder = new Notification.Builder(this);
         }
+        
+        // 电视UI规范优化
+        builder.setContentTitle("Post Tell Me")
+            .setContentText(contentText)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setPriority(Notification.PRIORITY_HIGH)
+            .setVisibility(Notification.VISIBILITY_PUBLIC);
+        
+        // 适配电视设备的通知样式
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            builder.setCategory(Notification.CATEGORY_SERVICE)
+                .setShowWhen(false);
+        }
+        
+        return builder.build();
     }
     
     public void updateNotification() {
@@ -301,7 +339,29 @@ public class ServerService extends Service {
             }
         }
         
+        // 增强后台保活能力
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // 对于Android O及以上，确保前台服务正常运行
+            startForeground(NOTIFICATION_ID, createNotification());
+        }
+        
         return START_STICKY;
+    }
+    
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+        Log.d(TAG, "Task removed, restarting service");
+        
+        // 当任务被移除时重启服务，增强保活能力
+        Intent restartIntent = new Intent(this, ServerService.class);
+        restartIntent.putExtra("port", currentServerPort);
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(restartIntent);
+        } else {
+            startService(restartIntent);
+        }
     }
     
     @Override

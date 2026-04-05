@@ -28,10 +28,12 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.View.OnKeyListener;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.EditText;
@@ -68,9 +70,58 @@ public class MainActivity extends Activity {
 			tvServerIP.setText(detectedIp);
 			tvServerPort.setText("1234");
 			
+			// 电视设备UI优化
+			// 增加字体大小和控件大小，适配电视屏幕
+			tvClientMsg.setTextSize(20);
+			tvServerIP.setTextSize(20);
+			tvServerPort.setTextSize(20);
+			
+			// 为遥控器导航添加焦点管理
+			tvServerIP.setFocusable(true);
+			tvServerIP.setFocusableInTouchMode(true);
+			tvServerPort.setFocusable(true);
+			tvServerPort.setFocusableInTouchMode(true);
+			
+			// 添加遥控器按键支持
+			tvServerIP.setOnKeyListener(new OnKeyListener() {
+				@Override
+				public boolean onKey(View v, int keyCode, KeyEvent event) {
+					if (event.getAction() == KeyEvent.ACTION_DOWN) {
+						if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+							tvServerPort.requestFocus();
+							return true;
+						}
+					}
+					return false;
+				}
+			});
+			
+			tvServerPort.setOnKeyListener(new OnKeyListener() {
+				@Override
+				public boolean onKey(View v, int keyCode, KeyEvent event) {
+					if (event.getAction() == KeyEvent.ACTION_DOWN) {
+						if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+							tvServerIP.requestFocus();
+							return true;
+						} else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+							Button btnConfirmPort = (Button) findViewById(R.id.buttonConfirmPort);
+							if (btnConfirmPort != null) {
+								btnConfirmPort.requestFocus();
+							}
+							return true;
+						}
+					}
+					return false;
+				}
+			});
+			
 			// Setup port confirm button
 			Button btnConfirmPort = (Button) findViewById(R.id.buttonConfirmPort);
 			if (btnConfirmPort != null) {
+				// 电视设备按钮优化
+				btnConfirmPort.setTextSize(18);
+				btnConfirmPort.setFocusable(true);
+				
 				btnConfirmPort.setOnClickListener(new OnClickListener() {
 					@Override
 					public void onClick(View v) {
@@ -103,16 +154,62 @@ public class MainActivity extends Activity {
 						}
 					}
 				});
+				
+				// 按钮焦点导航
+				btnConfirmPort.setOnKeyListener(new OnKeyListener() {
+					@Override
+					public boolean onKey(View v, int keyCode, KeyEvent event) {
+						if (event.getAction() == KeyEvent.ACTION_DOWN) {
+							if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+								tvServerPort.requestFocus();
+								return true;
+							} else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+								Button clearBtn = (Button) findViewById(R.id.button1);
+								if (clearBtn != null) {
+									clearBtn.requestFocus();
+								}
+								return true;
+							}
+						}
+						return false;
+					}
+				});
 			}
 			
 			clear = (Button)findViewById(R.id.button1);
-			clear.setOnClickListener(new OnClickListener() {
+			if (clear != null) {
+				// 电视设备按钮优化
+				clear.setTextSize(18);
+				clear.setFocusable(true);
 				
-				@Override
-				public void onClick(View v) {
-					tvClientMsg.setText("");
-				}
-			});
+				clear.setOnClickListener(new OnClickListener() {
+					
+					@Override
+					public void onClick(View v) {
+						tvClientMsg.setText("");
+					}
+				});
+				
+				// 按钮焦点导航
+				clear.setOnKeyListener(new OnKeyListener() {
+					@Override
+					public boolean onKey(View v, int keyCode, KeyEvent event) {
+						if (event.getAction() == KeyEvent.ACTION_DOWN) {
+							if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+								Button btnConfirmPort = (Button) findViewById(R.id.buttonConfirmPort);
+								if (btnConfirmPort != null) {
+									btnConfirmPort.requestFocus();
+								}
+								return true;
+							}
+						}
+						return false;
+					}
+				});
+			}
+			
+			// 设置初始焦点
+			tvServerIP.requestFocus();
 		} else {
 			// Not first start - finish activity without showing UI
 			Log.d("MainActivity", "Not first start, finishing activity");

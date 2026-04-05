@@ -18,7 +18,12 @@ public class BootReceiver extends BroadcastReceiver {
         if (Intent.ACTION_BOOT_COMPLETED.equals(action) ||
             "android.intent.action.QUICKBOOT_POWERON".equals(action) ||
             "android.intent.action.REBOOT".equals(action) ||
-            "android.intent.action.LOCKED_BOOT_COMPLETED".equals(action)) {
+            "android.intent.action.LOCKED_BOOT_COMPLETED".equals(action) ||
+            // 电视特有的广播事件
+            Intent.ACTION_USER_PRESENT.equals(action) ||
+            "android.intent.action.TV_INPUT_STATE_CHANGED".equals(action) ||
+            "android.intent.action.TV_WAKEUP".equals(action) ||
+            "android.intent.action.TV_SLEEP".equals(action)) {
             
             Log.d(TAG, "Starting Server service after boot");
             
