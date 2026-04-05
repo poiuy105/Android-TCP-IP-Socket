@@ -4,11 +4,9 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.PixelFormat;
-import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
-import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
@@ -51,18 +49,6 @@ public class FloatingWindowService extends Service {
     public void showWindow() {
         Log.d(TAG, "showWindow called");
         if (floatingView != null && floatingView.getWindowToken() == null) {
-            // 检查并请求悬浮窗权限
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (!Settings.canDrawOverlays(this)) {
-                    Log.w(TAG, "No overlay permission, requesting...");
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
-                    intent.setData(Uri.parse("package:" + getPackageName()));
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(intent);
-                    return;
-                }
-            }
-            
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 getWindowWidth(),
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -70,27 +56,16 @@ public class FloatingWindowService extends Service {
                     ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY 
                     : WindowManager.LayoutParams.TYPE_PHONE,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | 
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
-                // 电视设备优化
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 PixelFormat.TRANSLUCENT
             );
             
-            // 电视屏幕优化：右上角显示，适配电视屏幕大小
             params.gravity = Gravity.TOP | Gravity.END;
-            // 适配不同电视分辨率
-            DisplayMetrics displayMetrics = new DisplayMetrics();
-            windowManager.getDefaultDisplay().getMetrics(displayMetrics);
-            int screenWidth = displayMetrics.widthPixels;
-            int screenHeight = displayMetrics.heightPixels;
-            
-            // 根据屏幕尺寸调整边距
-            params.x = screenWidth / 50; // 屏幕宽度的2%
-            params.y = screenHeight / 50; // 屏幕高度的2%
+            params.x = 16;
+            params.y = 16;
             
             windowManager.addView(floatingView, params);
-            Log.d(TAG, "Floating window shown successfully on TV");
+            Log.d(TAG, "Floating window shown successfully");
         } else {
             Log.w(TAG, "Cannot show window - view is null or already shown");
         }

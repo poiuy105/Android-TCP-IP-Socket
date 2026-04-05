@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.server"
-    android:versionCode="2"
-    android:versionName="1.1" >
+    android:versionCode="1"
+    android:versionName="1.0" >
 
     <uses-sdk
         android:minSdkVersion="8"
@@ -15,9 +15,6 @@
 <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-<!-- TTS相关权限 -->
-<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:allowBackup="true"
@@ -43,11 +40,6 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.REBOOT" />
-                <!-- 电视特有的广播事件 -->
-                <action android:name="android.intent.action.USER_PRESENT" />
-                <action android:name="android.intent.action.TV_INPUT_STATE_CHANGED" />
-                <action android:name="android.intent.action.TV_WAKEUP" />
-                <action android:name="android.intent.action.TV_SLEEP" />
             </intent-filter>
         </receiver>
 
