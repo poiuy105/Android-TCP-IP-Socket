@@ -341,7 +341,7 @@ public class ServerService extends Service {
             
             Class<?> c = Class.forName("android.app.AppOpsManager");
             java.lang.reflect.Method checkOp = c.getMethod("checkOpNoThrow", int.class, int.class, String.class);
-            java.lang.reflect.Method opRunInBackground = c.getField("OP_RUN_IN_BACKGROUND").getInt(null);
+            int opRunInBackground = c.getField("OP_RUN_IN_BACKGROUND").getInt(null);
             
             Object appOps = getSystemService(Context.APP_OPS_SERVICE);
             int result = (Integer) checkOp.invoke(appOps, opRunInBackground, android.os.Process.myUid(), packageName);
