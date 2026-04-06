@@ -50,22 +50,36 @@ if [ ! -f "$MQTT_ANDROID_JAR" ]; then
     wget -O "$MQTT_ANDROID_JAR" "https://repo1.maven.org/maven2/org/eclipse/paho/org.eclipse.paho.android.service/1.1.1/org.eclipse.paho.android.service-1.1.1.jar"
 fi
 
+# Copy local support libraries if available
+if [ -f "Server/bin/dexedLibs/android-support-v4-0131180b4fa77264a63c4f561b6509c8.jar" ]; then
+    echo "Using local support-v4 library"
+    cp -f Server/bin/dexedLibs/android-support-v4-0131180b4fa77264a63c4f561b6509c8.jar Server/libs/android-support-v4.jar 2>/dev/null || true
+fi
+
+if [ -f "Server/bin/dexedLibs/android-support-v7-appcompat-542251fa48d244d9965069beee8f8ead.jar" ]; then
+    echo "Using local support-v7-appcompat library"
+    cp -f Server/bin/dexedLibs/android-support-v7-appcompat-542251fa48d244d9965069beee8f8ead.jar Server/libs/android-support-v7-appcompat.jar 2>/dev/null || true
+fi
+
 # Verify JAR files exist
-if [ ! -f "$MQTT_CLIENT_JAR" ]; then
-    echo "ERROR: MQTT Client JAR not found"
-    exit 1
-fi
+echo "Checking dependencies..."
+for jar in "$MQTT_CLIENT_JAR" "$MQTT_ANDROID_JAR"; do
+    if [ ! -f "$jar" ]; then
+        echo "ERROR: Required JAR not found: $jar"
+        exit 1
+    fi
+done
 
-if [ ! -f "$MQTT_ANDROID_JAR" ]; then
-    echo "ERROR: MQTT Android Service JAR not found"
-    exit 1
-fi
-
-echo "MQTT dependencies ready"
+echo "All dependencies ready"
 ls -la Server/libs/
 
 # Build classpath with all JARs
-CLASSPATH="$ANDROID_JAR:$MQTT_CLIENT_JAR:$MQTT_ANDROID_JAR"
+CLASSPATH="$ANDROID_JAR"
+for jar in Server/libs/*.jar; do
+    if [ -f "$jar" ]; then
+        CLASSPATH="$CLASSPATH:$jar"
+    fi
+done
 
 echo "Classpath: $CLASSPATH"
 
@@ -93,17 +107,22 @@ $JAVAC -source 1.8 -target 1.8 -d Server/bin -cp "$CLASSPATH" @Server/src_files.
 echo "Compiled class files:"
 find Server/bin -name "*.class" | head -20
 
-# Step 3: Create DEX file
-echo "=== Step 3: Create DEX file ==="
+# Step 3: Create DEX files
+echo "=== Step 3: Create DEX files ==="
 
-# Use d8 to convert class files to DEX
-# First, convert our class files
-echo "Converting class files to DEX..."
-$ANDROID_HOME/build-tools/34.0.0/d8 --output Server/bin --lib "$ANDROID_JAR" $(find Server/bin -name "*.class")
+# Collect all JAR files
+JAR_FILES=""
+for jar in Server/libs/*.jar; do
+    if [ -f "$jar" ]; then
+        JAR_FILES="$JAR_FILES $jar"
+    fi
+done
 
-# Then convert JAR files to DEX
-echo "Converting JAR files to DEX..."
-$ANDROID_HOME/build-tools/34.0.0/d8 --output Server/bin --lib "$ANDROID_JAR" Server/libs/*.jar
+# Convert all class files and JARs to DEX in one pass
+echo "Converting all classes and JARs to DEX..."
+$ANDROID_HOME/build-tools/34.0.0/d8 --output Server/bin --lib "$ANDROID_JAR" \
+    $(find Server/bin -name "*.class") \
+    $JAR_FILES
 
 echo "DEX files created:"
 ls -la Server/bin/*.dex 2>/dev/null || {
@@ -111,12 +130,16 @@ ls -la Server/bin/*.dex 2>/dev/null || {
     exit 1
 }
 
+# Count DEX files
+DEX_COUNT=$(ls Server/bin/*.dex 2>/dev/null | wc -l)
+echo "Total DEX files: $DEX_COUNT"
+
 # Step 4: Package APK
 echo "=== Step 4: Package APK ==="
 # Remove any existing files that might interfere
 rm -f Server/bin/AndroidManifest.xml 2>/dev/null || true
 
-# Package with aapt
+# Package with aapt - include all DEX files
 echo "Packaging APK..."
 $AAPT package -f -M Server/AndroidManifest.xml -S Server/res -I "$ANDROID_JAR" -F Server/bin/PostTellMe.unaligned.apk Server/bin
 
@@ -124,6 +147,10 @@ if [ ! -f Server/bin/PostTellMe.unaligned.apk ]; then
     echo "ERROR: APK package not created"
     exit 1
 fi
+
+# List APK contents to verify DEX files are included
+echo "APK contents (DEX files):"
+$ANDROID_HOME/build-tools/34.0.0/aapt list Server/bin/PostTellMe.unaligned.apk | grep -E "\.dex$" || echo "No DEX files found in APK!"
 
 # Step 5: Align APK
 echo "=== Step 5: Align APK ==="
@@ -158,3 +185,7 @@ rm -f Server/src_files.txt
 echo "=== Build completed successfully! ==="
 echo "APK location: Server/bin/PostTellMe.apk"
 ls -la Server/bin/PostTellMe.apk
+
+# Show final APK contents
+echo "=== Final APK DEX files ==="
+$ANDROID_HOME/build-tools/34.0.0/aapt list Server/bin/PostTellMe.apk | grep -E "\.dex$"

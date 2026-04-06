@@ -30,6 +30,7 @@ public class MqttManager implements MqttCallback {
     private MqttConnectionListener connectionListener;
     private MqttMessageListener messageListener;
     private boolean isConnecting = false;
+    private boolean initialized = false;
     
     public interface MqttConnectionListener {
         void onConnected();
@@ -42,13 +43,33 @@ public class MqttManager implements MqttCallback {
     }
     
     public MqttManager(Context context) {
-        this.context = context.getApplicationContext();
-        this.config = loadConfig();
+        Log.d(TAG, "MqttManager constructor called");
+        try {
+            this.context = context.getApplicationContext();
+            this.config = loadConfig();
+            this.initialized = true;
+            Log.d(TAG, "MqttManager initialized successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize MqttManager", e);
+            this.initialized = false;
+        }
     }
     
     public MqttManager(Context context, MqttConfig config) {
-        this.context = context.getApplicationContext();
-        this.config = config != null ? config : loadConfig();
+        Log.d(TAG, "MqttManager constructor with config called");
+        try {
+            this.context = context.getApplicationContext();
+            this.config = config != null ? config : loadConfig();
+            this.initialized = true;
+            Log.d(TAG, "MqttManager initialized successfully with config");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize MqttManager with config", e);
+            this.initialized = false;
+        }
+    }
+    
+    public boolean isInitialized() {
+        return initialized;
     }
     
     public void setConnectionListener(MqttConnectionListener listener) {
@@ -69,6 +90,14 @@ public class MqttManager implements MqttCallback {
     }
     
     public void connect() {
+        Log.d(TAG, "connect() called, initialized=" + initialized);
+        
+        if (!initialized) {
+            Log.e(TAG, "MqttManager not initialized, cannot connect");
+            notifyConnectionFailed(new Exception("MqttManager not initialized"));
+            return;
+        }
+        
         if (mqttClient != null && mqttClient.isConnected()) {
             Log.d(TAG, "Already connected");
             return;
@@ -81,24 +110,28 @@ public class MqttManager implements MqttCallback {
         
         isConnecting = true;
         
-        String clientId = config.getClientId();
-        mqttClient = new MqttAndroidClient(context, config.getServerUri(), clientId);
-        mqttClient.setCallback(this);
-        
-        MqttConnectOptions options = new MqttConnectOptions();
-        options.setKeepAliveInterval(config.getKeepAliveInterval());
-        options.setConnectionTimeout(config.getConnectionTimeout());
-        options.setCleanSession(config.isCleanSession());
-        options.setAutomaticReconnect(config.isAutoReconnect());
-        
-        if (config.hasCredentials()) {
-            options.setUserName(config.getUsername());
-            options.setPassword(config.getPassword().toCharArray());
-        }
-        
-        Log.d(TAG, "Connecting to MQTT broker: " + config.getServerUri());
-        
         try {
+            String clientId = config.getClientId();
+            String serverUri = config.getServerUri();
+            
+            Log.d(TAG, "Creating MqttAndroidClient: " + serverUri + ", clientId=" + clientId);
+            
+            mqttClient = new MqttAndroidClient(context, serverUri, clientId);
+            mqttClient.setCallback(this);
+            
+            MqttConnectOptions options = new MqttConnectOptions();
+            options.setKeepAliveInterval(config.getKeepAliveInterval());
+            options.setConnectionTimeout(config.getConnectionTimeout());
+            options.setCleanSession(config.isCleanSession());
+            options.setAutomaticReconnect(config.isAutoReconnect());
+            
+            if (config.hasCredentials()) {
+                options.setUserName(config.getUsername());
+                options.setPassword(config.getPassword().toCharArray());
+            }
+            
+            Log.d(TAG, "Connecting to MQTT broker: " + serverUri);
+            
             mqttClient.connect(options, null, new IMqttActionListener() {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
@@ -117,6 +150,10 @@ public class MqttManager implements MqttCallback {
             });
         } catch (MqttException e) {
             Log.e(TAG, "MQTT connection error", e);
+            isConnecting = false;
+            notifyConnectionFailed(e);
+        } catch (Exception e) {
+            Log.e(TAG, "Unexpected error during MQTT connection", e);
             isConnecting = false;
             notifyConnectionFailed(e);
         }
@@ -145,10 +182,13 @@ public class MqttManager implements MqttCallback {
             });
         } catch (MqttException e) {
             Log.e(TAG, "Subscription error", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Unexpected subscription error", e);
         }
     }
     
     public void disconnect() {
+        Log.d(TAG, "disconnect() called");
         if (mqttClient != null && mqttClient.isConnected()) {
             try {
                 mqttClient.disconnect(null, new IMqttActionListener() {
@@ -165,11 +205,17 @@ public class MqttManager implements MqttCallback {
                 });
             } catch (MqttException e) {
                 Log.e(TAG, "Disconnect error", e);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected disconnect error", e);
             }
         }
         
         if (mqttClient != null) {
-            mqttClient.unregisterResources();
+            try {
+                mqttClient.unregisterResources();
+            } catch (Exception e) {
+                Log.e(TAG, "Error unregistering resources", e);
+            }
             mqttClient = null;
         }
     }
@@ -191,6 +237,8 @@ public class MqttManager implements MqttCallback {
             Log.d(TAG, "Published to " + topic + ": " + payload);
         } catch (MqttException e) {
             Log.e(TAG, "Publish error", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Unexpected publish error", e);
         }
     }
     
@@ -205,6 +253,7 @@ public class MqttManager implements MqttCallback {
     @Override
     public void connectionLost(Throwable cause) {
         Log.w(TAG, "MQTT connection lost", cause);
+        isConnecting = false;
         notifyConnectionStatus(false);
     }
     
@@ -232,8 +281,12 @@ public class MqttManager implements MqttCallback {
             }
         }
         
-        Intent intent = new Intent(connected ? ACTION_MQTT_CONNECTED : ACTION_MQTT_DISCONNECTED);
-        context.sendBroadcast(intent);
+        try {
+            Intent intent = new Intent(connected ? ACTION_MQTT_CONNECTED : ACTION_MQTT_DISCONNECTED);
+            context.sendBroadcast(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Error sending broadcast", e);
+        }
     }
     
     private void notifyConnectionFailed(Throwable cause) {
@@ -243,47 +296,58 @@ public class MqttManager implements MqttCallback {
     }
     
     public void saveConfig(MqttConfig config) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putString("serverUri", config.getServerUri());
-        editor.putString("clientId", config.getClientId());
-        editor.putString("username", config.getUsername());
-        editor.putString("password", config.getPassword());
-        editor.putInt("keepAlive", config.getKeepAliveInterval());
-        editor.putBoolean("cleanSession", config.isCleanSession());
-        editor.putInt("qos", config.getQos());
-        editor.putString("topicPrefix", config.getTopicPrefix());
-        editor.putBoolean("autoReconnect", config.isAutoReconnect());
-        editor.putInt("connectionTimeout", config.getConnectionTimeout());
-        editor.apply();
-        Log.d(TAG, "MQTT config saved");
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString("serverUri", config.getServerUri());
+            editor.putString("clientId", config.getClientId());
+            editor.putString("username", config.getUsername());
+            editor.putString("password", config.getPassword());
+            editor.putInt("keepAlive", config.getKeepAliveInterval());
+            editor.putBoolean("cleanSession", config.isCleanSession());
+            editor.putInt("qos", config.getQos());
+            editor.putString("topicPrefix", config.getTopicPrefix());
+            editor.putBoolean("autoReconnect", config.isAutoReconnect());
+            editor.putInt("connectionTimeout", config.getConnectionTimeout());
+            editor.apply();
+            Log.d(TAG, "MQTT config saved");
+        } catch (Exception e) {
+            Log.e(TAG, "Error saving config", e);
+        }
     }
     
     private MqttConfig loadConfig() {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        MqttConfig config = new MqttConfig();
-        
-        String serverUri = prefs.getString("serverUri", null);
-        if (serverUri != null) {
-            config.setServerUri(serverUri);
-            config.setClientId(prefs.getString("clientId", config.getClientId()));
-            config.setUsername(prefs.getString("username", ""));
-            config.setPassword(prefs.getString("password", ""));
-            config.setKeepAliveInterval(prefs.getInt("keepAlive", MqttConfig.DEFAULT_KEEP_ALIVE));
-            config.setCleanSession(prefs.getBoolean("cleanSession", MqttConfig.DEFAULT_CLEAN_SESSION));
-            config.setQos(prefs.getInt("qos", MqttConfig.DEFAULT_QOS));
-            config.setTopicPrefix(prefs.getString("topicPrefix", MqttConfig.DEFAULT_TOPIC_PREFIX));
-            config.setAutoReconnect(prefs.getBoolean("autoReconnect", true));
-            config.setConnectionTimeout(prefs.getInt("connectionTimeout", 30));
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            MqttConfig config = new MqttConfig();
+            
+            String serverUri = prefs.getString("serverUri", null);
+            if (serverUri != null) {
+                config.setServerUri(serverUri);
+                config.setClientId(prefs.getString("clientId", config.getClientId()));
+                config.setUsername(prefs.getString("username", ""));
+                config.setPassword(prefs.getString("password", ""));
+                config.setKeepAliveInterval(prefs.getInt("keepAlive", MqttConfig.DEFAULT_KEEP_ALIVE));
+                config.setCleanSession(prefs.getBoolean("cleanSession", MqttConfig.DEFAULT_CLEAN_SESSION));
+                config.setQos(prefs.getInt("qos", MqttConfig.DEFAULT_QOS));
+                config.setTopicPrefix(prefs.getString("topicPrefix", MqttConfig.DEFAULT_TOPIC_PREFIX));
+                config.setAutoReconnect(prefs.getBoolean("autoReconnect", true));
+                config.setConnectionTimeout(prefs.getInt("connectionTimeout", 30));
+            }
+            
+            Log.d(TAG, "MQTT config loaded: " + config);
+            return config;
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading config, using defaults", e);
+            return new MqttConfig();
         }
-        
-        Log.d(TAG, "MQTT config loaded: " + config);
-        return config;
     }
     
     public void release() {
+        Log.d(TAG, "release() called");
         disconnect();
         connectionListener = null;
         messageListener = null;
+        initialized = false;
     }
 }
