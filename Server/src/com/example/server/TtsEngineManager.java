@@ -792,7 +792,7 @@ public class TtsEngineManager {
         
         Bundle params = new Bundle();
         params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 0.5f);
-        testTts.speak(testText, TextToSpeech.QUEUE_FLUSH, params, "test_" + System.currentTimeMillis());
+        testTtsHolder[0].speak(testText, TextToSpeech.QUEUE_FLUSH, params, "test_" + System.currentTimeMillis());
     }
     
     public void testAllEngines(final TtsTestListener listener) {
