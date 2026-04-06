@@ -37,12 +37,28 @@ MQTT_ANDROID_JAR="Server/libs/org.eclipse.paho.android.service-1.1.1.jar"
 if [ ! -f "$MQTT_CLIENT_JAR" ]; then
     echo "Downloading Paho MQTT Client..."
     wget -q -O "$MQTT_CLIENT_JAR" "https://repo1.maven.org/maven2/org/eclipse/paho/org.eclipse.paho.client.mqttv3/1.2.5/org.eclipse.paho.client.mqttv3-1.2.5.jar"
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to download Paho MQTT Client"
+        exit 1
+    fi
 fi
 
 if [ ! -f "$MQTT_ANDROID_JAR" ]; then
     echo "Downloading Paho MQTT Android Service..."
     wget -q -O "$MQTT_ANDROID_JAR" "https://repo1.maven.org/maven2/org/eclipse/paho/org.eclipse.paho.android.service/1.1.1/org.eclipse.paho.android.service-1.1.1.jar"
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to download Paho MQTT Android Service"
+        exit 1
+    fi
 fi
+
+# Verify JAR files exist
+if [ ! -f "$MQTT_CLIENT_JAR" ] || [ ! -f "$MQTT_ANDROID_JAR" ]; then
+    echo "ERROR: MQTT JAR files not found after download"
+    exit 1
+fi
+
+echo "MQTT dependencies ready"
 
 # Build classpath with all JARs
 CLASSPATH="$ANDROID_JAR"
@@ -68,10 +84,17 @@ echo "=== Step 2: Compile Java files ==="
 find Server/src -name "*.java" > Server/src_files.txt
 find Server/gen -name "*.java" >> Server/src_files.txt
 
-$JAVAC -d Server/bin -cp "$CLASSPATH" @Server/src_files.txt
+if [ ! -s Server/src_files.txt ]; then
+    echo "ERROR: No Java source files found"
+    exit 1
+fi
+
+echo "Compiling Java files..."
+$JAVAC -source 1.8 -target 1.8 -d Server/bin -cp "$CLASSPATH" @Server/src_files.txt
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to compile Java files"
+    cat Server/src_files.txt
     exit 1
 fi
 
@@ -80,20 +103,14 @@ echo "=== Step 3: Create DEX file ==="
 # Find all class files and JAR files
 find Server/bin -name "*.class" > Server/class_files.txt
 
-# Add JAR files to DEX
-DEX_INPUTS=""
-for jar in Server/libs/*.jar; do
-    if [ -f "$jar" ]; then
-        DEX_INPUTS="$DEX_INPUTS $jar"
-    fi
-done
-
-if [ -s Server/class_files.txt ]; then
-    $ANDROID_HOME/build-tools/34.0.0/d8 --output Server/bin @Server/class_files.txt $DEX_INPUTS
-else
+if [ ! -s Server/class_files.txt ]; then
     echo "ERROR: No class files found"
     exit 1
 fi
+
+# Convert class files to DEX using d8
+echo "Converting to DEX..."
+$ANDROID_HOME/build-tools/34.0.0/d8 --output Server/bin --lib "$ANDROID_JAR" @Server/class_files.txt Server/libs/*.jar
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to create DEX file"
@@ -102,10 +119,12 @@ fi
 
 # Step 4: Package APK
 echo "=== Step 4: Package APK ==="
-# Remove duplicate AndroidManifest.xml from bin directory
+# Remove duplicate AndroidManifest.xml from bin directory if exists
 if [ -f Server/bin/AndroidManifest.xml ]; then
     rm Server/bin/AndroidManifest.xml
 fi
+
+# Package with aapt
 $AAPT package -f -M Server/AndroidManifest.xml -S Server/res -I "$ANDROID_JAR" -F Server/bin/PostTellMe.unaligned.apk Server/bin
 
 if [ $? -ne 0 ]; then
@@ -142,9 +161,10 @@ if [ $? -ne 0 ]; then
 fi
 
 # Clean up
-rm Server/bin/PostTellMe.unaligned.apk
-rm Server/src_files.txt
-rm Server/class_files.txt
+rm -f Server/bin/PostTellMe.unaligned.apk
+rm -f Server/src_files.txt
+rm -f Server/class_files.txt
 
 echo "=== Build completed successfully! ==="
 echo "APK location: Server/bin/PostTellMe.apk"
+ls -la Server/bin/PostTellMe.apk
