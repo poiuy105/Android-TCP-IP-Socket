@@ -25,7 +25,6 @@ jobs:
         cd $HOME/android-sdk
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
         unzip -q commandlinetools-linux-11076708_latest.zip
-        # Create latest directory and move contents
         mkdir -p cmdline-tools/latest
         mv cmdline-tools/bin cmdline-tools/latest/
         mv cmdline-tools/lib cmdline-tools/latest/
@@ -39,9 +38,7 @@ jobs:
     
     - name: Install Android SDK Components
       run: |
-        # Accept licenses
         yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
-        # Install components
         $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager "build-tools;34.0.0" "platforms;android-34" "platform-tools"
     
     - name: Build PostTellMe APK
@@ -50,8 +47,47 @@ jobs:
     - name: Upload PostTellMe APK
       uses: actions/upload-artifact@v4
       with:
-        name: PostTellMe-apk
+        name: PostTellMe-apk-v1.1
         path: |
           Server/build/outputs/apk/debug/*.apk
           Server/bin/*.apk
       if: always()
+    
+    - name: Create Release
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v1.1
+        name: Release v1.1 - Android TV Compatibility
+        body: |
+          ## Android TV Compatibility Optimization v1.1
+          
+          ### New Features
+          - Android TV boot auto-start feature
+          - Optimized background service keep-alive mechanism
+          - Enhanced TTS compatibility for TV devices
+          - Improved floating window display on TV screens
+          - Updated targetSdkVersion to 34
+          
+          ### Improvements
+          - Added TV device detection and adaptive boot delay
+          - Implemented service restart mechanism with retry logic
+          - Enhanced notification priority for TV devices
+          - Optimized floating window size and position for TV screens
+          - Added memory management for TV device compatibility
+          
+          ### Technical Changes
+          - Updated minSdkVersion to 21
+          - Updated compileSdkVersion to 34
+          - Migrated to AndroidX libraries
+          - Added Leanback support for Android TV
+          
+          ### Compatibility
+          - Tested on Android TV devices
+          - Compatible with Android 5.0+ (API 21+)
+          - Supports both phone and TV form factors
+        files: |
+          Server/build/outputs/apk/debug/*.apk
+          Server/bin/*.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
