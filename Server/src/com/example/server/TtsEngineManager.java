@@ -233,8 +233,8 @@ public class TtsEngineManager {
     }
     
     private boolean isDefaultEngine(String packageName) {
-        if (tts != null) {
-            String defaultEngine = tts.getDefaultEngine();
+        if (textToSpeech != null) {
+            String defaultEngine = textToSpeech.getDefaultEngine();
             return packageName != null && packageName.equals(defaultEngine);
         }
         return false;
