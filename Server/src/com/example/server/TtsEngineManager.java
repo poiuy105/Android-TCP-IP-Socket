@@ -706,7 +706,8 @@ public class TtsEngineManager {
         };
         timeoutHandler.postDelayed(timeoutRunnable, DEFAULT_TEST_TIMEOUT_MS);
         
-        TextToSpeech testTts = new TextToSpeech(context, new TextToSpeech.OnInitListener() {
+        final TextToSpeech[] testTtsHolder = new TextToSpeech[1];
+        testTtsHolder[0] = new TextToSpeech(context, new TextToSpeech.OnInitListener() {
             @Override
             public void onInit(int status) {
                 if (status != TextToSpeech.SUCCESS) {
@@ -724,18 +725,18 @@ public class TtsEngineManager {
                     return;
                 }
                 
-                int langResult = testTts.setLanguage(Locale.CHINESE);
+                int langResult = testTtsHolder[0].setLanguage(Locale.CHINESE);
                 result.supportsChinese = (langResult != TextToSpeech.LANG_MISSING_DATA && 
                                          langResult != TextToSpeech.LANG_NOT_SUPPORTED);
                 
-                langResult = testTts.setLanguage(Locale.ENGLISH);
+                langResult = testTtsHolder[0].setLanguage(Locale.ENGLISH);
                 result.supportsEnglish = (langResult != TextToSpeech.LANG_MISSING_DATA && 
                                          langResult != TextToSpeech.LANG_NOT_SUPPORTED);
             }
         }, enginePackageName);
         
-        final TextToSpeech finalTestTts = testTts;
-        testTts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+        final TextToSpeech finalTestTts = testTtsHolder[0];
+        testTtsHolder[0].setOnUtteranceProgressListener(new UtteranceProgressListener() {
             @Override
             public void onStart(String utteranceId) {
             }
