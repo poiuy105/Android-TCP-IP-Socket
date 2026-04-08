@@ -93,9 +93,16 @@ public class JavaMQTT {
     }
 
     public void connect(String username, String password, ConnectionListener listener) {
+        boolean shouldConnect = false;
         synchronized (connectLock) {
-            if (isConnecting || client.isConnected()) return;
-            isConnecting = true;
+            if (!isConnecting && !client.isConnected()) {
+                isConnecting = true;
+                shouldConnect = true;
+            }
+        }
+
+        if (!shouldConnect) {
+            return;
         }
 
         executor.execute(() -> {
@@ -106,20 +113,26 @@ public class JavaMQTT {
                     @Override
                     public void onSuccess(IMqttToken asyncActionToken) {
                         Log.i(TAG, "MQTT connect success");
-                        isConnecting = false;
+                        synchronized (connectLock) {
+                            isConnecting = false;
+                        }
                         if (listener != null) callbackExecutor.execute(listener::onSuccess);
                     }
 
                     @Override
                     public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
                         Log.e(TAG, "Connect exception", exception);
-                        isConnecting = false;
+                        synchronized (connectLock) {
+                            isConnecting = false;
+                        }
                         if (listener != null) callbackExecutor.execute(() -> listener.onFailure(exception));
                     }
                 });
             } catch (MqttException e) {
                 Log.e(TAG, "Immediate connect failure", e);
-                isConnecting = false;
+                synchronized (connectLock) {
+                    isConnecting = false;
+                }
                 if (listener != null) callbackExecutor.execute(() -> listener.onFailure(e));
             }
         });
