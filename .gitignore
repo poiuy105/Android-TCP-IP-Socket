@@ -1,0 +1,23 @@
+# Build artifacts
+PostTellMe-apk/bin/
+Server/bin/
+Server/gen/
+Server/libs/
+
+# IDE files
+.idea/
+.gradle/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
