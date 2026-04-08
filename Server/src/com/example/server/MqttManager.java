@@ -114,8 +114,10 @@ public class MqttManager {
                 mqttClient.close();
             }
             initMqttClient();
+            this.initialized = true;
         } catch (MqttException e) {
             Log.e(TAG, "Error reinitializing MQTT client", e);
+            this.initialized = false;
         }
     }
     
@@ -128,7 +130,13 @@ public class MqttManager {
             return;
         }
         
-        if (mqttClient != null && mqttClient.isConnected()) {
+        if (mqttClient == null) {
+            Log.e(TAG, "MQTT client is null, cannot connect");
+            notifyConnectionFailed(new Exception("MQTT client is null"));
+            return;
+        }
+        
+        if (mqttClient.isConnected()) {
             Log.d(TAG, "Already connected");
             return;
         }
